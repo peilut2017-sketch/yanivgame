@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>יניב</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0c5240">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="יניב">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=Heebo:wght@300;400;500;700;900&display=swap');
+
+  :root{
+    --felt:#0c5240;
+    --felt-light:#16705a;
+    --felt-dark:#04261d;
+    --gold:#d4af37;
+    --gold-soft:#f1dd9c;
+    --gold-deep:#b8941f;
+    --gold-dark:#8a6d14;
+    --cream:#f6efdc;
+    --red:#b5302a;
+    --ink:#1a1a1a;
+    --shadow:rgba(0,0,0,.4);
+    --glass:rgba(255,255,255,.06);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{
+    font-family:'Heebo',sans-serif;
+    background:
+      radial-gradient(ellipse 120% 90% at 50% 30%, var(--felt-light) 0%, var(--felt) 42%, #063528 72%, var(--felt-dark) 100%);
+    color:var(--cream);
+    user-select:none;
+    position:relative;
+  }
+  /* felt weave + vignette + grain */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(ellipse 90% 80% at 50% 45%, transparent 50%, rgba(0,0,0,.45) 100%);
+  }
+  .screen{position:fixed;inset:0;display:none;flex-direction:column;z-index:1;}
+  .screen.active{display:flex;animation:screenIn .4s ease both;}
+  @keyframes screenIn{from{opacity:0}to{opacity:1}}
+
+  /* ===== shared gold filigree frame helper ===== */
+  .gilt{position:relative;}
+  .gilt::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
+    background:linear-gradient(135deg,var(--gold-soft),var(--gold) 25%,var(--gold-dark) 55%,var(--gold) 80%,var(--gold-soft));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;
+  }
+
+  /* ===== SETTINGS ===== */
+  #settings{align-items:center;justify-content:flex-start;padding:28px 24px;overflow-y:auto;}
+  #settings h2{font-family:'Frank Ruhl Libre',serif;font-size:34px;margin-bottom:6px;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    animation:fadeUp .6s ease both;}
+  #settings .sub{font-size:13px;opacity:.6;margin-bottom:24px;}
+  .opt-row{width:min(420px,90vw);margin-bottom:20px;}
+  .opt-row .q{font-size:15px;font-weight:500;margin-bottom:8px;}
+  .opt-row .q .why{display:block;font-size:11px;opacity:.5;font-weight:300;margin-top:2px;}
+  .seg{display:flex;gap:8px;}
+  .seg button{
+    flex:1;padding:13px 8px;border-radius:12px;border:2px solid rgba(255,255,255,.15);
+    background:rgba(0,0,0,.2);color:var(--cream);font-family:'Heebo';font-size:15px;
+    font-weight:700;cursor:pointer;transition:.15s;
+  }
+  .seg button.on{background:linear-gradient(180deg,var(--gold-soft),var(--gold));color:var(--felt-dark);border-color:var(--gold);}
+  .seg button:active{transform:scale(.96);}
+
+  /* ===== MENU ===== */
+  #menu{align-items:center;justify-content:center;padding:24px;}
+  .suit-bg{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:-1;}
+  .suit-bg span{
+    position:absolute;font-size:60px;color:rgba(212,175,55,.06);
+    animation:floatSuit linear infinite;
+  }
+  @keyframes floatSuit{
+    0%{transform:translateY(110vh) rotate(0)}
+    100%{transform:translateY(-20vh) rotate(360deg)}
+  }
+  .logo{
+    font-family:'Frank Ruhl Libre',serif;font-weight:900;
+    font-size:clamp(64px,22vw,150px);line-height:.9;
+    letter-spacing:-.02em;margin-bottom:10px;
+    background:linear-gradient(180deg,var(--gold-soft) 0%,var(--gold) 40%,var(--gold-deep) 70%,var(--gold-soft) 100%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 3px 0 var(--felt-dark)) drop-shadow(0 10px 22px rgba(0,0,0,.5));
+    animation:drop 1s cubic-bezier(.2,.9,.3,1.3),shimmer 4s ease-in-out 1s infinite;
+    position:relative;background-size:200% 200%;
+  }
+  @keyframes drop{0%{transform:translateY(-70px) scale(.7) rotate(-4deg);opacity:0}100%{transform:none;opacity:1}}
+  @keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  .tagline{font-size:14px;opacity:.75;letter-spacing:.45em;margin-bottom:48px;font-weight:300;
+    animation:fadeUp .8s ease .4s both;color:var(--gold-soft);}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:.75;transform:none}}
+  .menu-btns{display:flex;flex-direction:column;gap:16px;width:min(340px,86vw);}
+  .menu-btns .btn{animation:fadeUp .6s ease both;}
+  .menu-btns .btn:nth-child(1){animation-delay:.5s}
+  .menu-btns .btn:nth-child(2){animation-delay:.65s}
+  .menu-btns .btn:nth-child(3){animation-delay:.8s}
+  .btn{
+    font-family:'Heebo',sans-serif;font-size:19px;font-weight:700;
+    padding:18px 24px;border:none;border-radius:16px;cursor:pointer;
+    background:linear-gradient(180deg,var(--gold-soft) 0%,var(--gold) 50%,var(--gold-deep) 100%);
+    color:#3a2e08;box-shadow:0 6px 0 var(--gold-dark),0 12px 24px var(--shadow),inset 0 1px 0 rgba(255,255,255,.6);
+    transition:transform .12s,box-shadow .12s;position:relative;overflow:hidden;
+    text-shadow:0 1px 0 rgba(255,255,255,.35);
+  }
+  .btn::after{
+    content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;
+    background:linear-gradient(105deg,transparent,rgba(255,255,255,.55),transparent);
+    transform:skewX(-18deg);animation:gloss 4.5s ease-in-out infinite;
+  }
+  @keyframes gloss{0%,70%{left:-60%}85%,100%{left:130%}}
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--gold-dark),0 4px 10px var(--shadow);}
+  .btn.ghost{
+    background:var(--glass);color:var(--cream);
+    border:1.5px solid rgba(212,175,55,.4);box-shadow:none;font-weight:400;font-size:16px;
+    text-shadow:none;backdrop-filter:blur(4px);
+  }
+  .btn.ghost::after{display:none;}
+  .btn.ghost:active{transform:scale(.97);background:rgba(255,255,255,.1);}
+
+  /* ===== ONLINE SETUP ===== */
+  .setup{align-items:center;justify-content:center;padding:24px;gap:14px;}
+  .setup h2{font-family:'Frank Ruhl Libre',serif;font-size:32px;margin-bottom:8px;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .field{width:min(380px,88vw);}
+  .field label{display:block;font-size:13px;opacity:.7;margin-bottom:6px;padding-right:4px;}
+  .field input{
+    width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid rgba(212,175,55,.3);
+    background:rgba(0,0,0,.3);color:var(--cream);font-size:16px;font-family:'Heebo';outline:none;transition:.2s;
+  }
+  .field input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.18);}
+  .hint{font-size:12px;opacity:.6;max-width:380px;text-align:center;line-height:1.5;}
+  .room-code{
+    font-family:'Frank Ruhl Libre',serif;font-size:52px;font-weight:900;letter-spacing:.18em;
+    background:rgba(0,0,0,.35);padding:18px 34px;border-radius:18px;
+    border:2px dashed var(--gold);
+    background-image:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    box-shadow:inset 0 0 30px rgba(212,175,55,.12);
+    animation:codePulse 2s ease-in-out infinite;
+  }
+  @keyframes codePulse{0%,100%{box-shadow:inset 0 0 20px rgba(212,175,55,.1)}50%{box-shadow:inset 0 0 40px rgba(212,175,55,.25)}}
+  .status{font-size:15px;opacity:.8;min-height:22px;text-align:center;}
+
+  /* ===== GAME TABLE ===== */
+  #game{padding:0;}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));
+    background:linear-gradient(180deg,rgba(0,0,0,.4),rgba(0,0,0,.2));
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid rgba(212,175,55,.25);z-index:5;
+  }
+  .topbar .ico{
+    background:var(--glass);border:1px solid rgba(212,175,55,.3);color:var(--gold-soft);
+    width:42px;height:42px;border-radius:12px;font-size:18px;cursor:pointer;transition:.15s;
+  }
+  .topbar .ico:active{transform:scale(.9);background:rgba(212,175,55,.2);}
+  .turn-pill{font-size:14px;font-weight:700;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));color:#3a2e08;
+    padding:9px 20px;border-radius:22px;box-shadow:0 0 0 1px rgba(255,255,255,.3) inset,0 2px 8px rgba(0,0,0,.3);
+    animation:pillGlow 2s ease-in-out infinite;}
+  @keyframes pillGlow{0%,100%{box-shadow:0 0 0 1px rgba(255,255,255,.3) inset,0 0 10px rgba(212,175,55,.4)}
+    50%{box-shadow:0 0 0 1px rgba(255,255,255,.3) inset,0 0 22px rgba(212,175,55,.85)}}
+  .turn-pill.theirs{background:var(--glass);color:var(--cream);border:1px solid rgba(255,255,255,.2);animation:none;box-shadow:none;}
+
+  .statbar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 16px;background:rgba(0,0,0,.18);
+    border-bottom:1px solid rgba(212,175,55,.12);font-size:13px;z-index:4;
+  }
+  .stat-round{opacity:.85;letter-spacing:.04em;}
+  .stat-round b{color:var(--gold);font-family:'Frank Ruhl Libre',serif;font-size:16px;}
+  .stat-timer{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:64px;
+    padding:4px 10px;border-radius:10px;transition:.3s;border:1px solid transparent;}
+  .stat-timer .t-name{font-size:10px;opacity:.6;}
+  .stat-timer .t-val{font-family:'Frank Ruhl Libre',serif;font-weight:700;font-size:15px;
+    font-variant-numeric:tabular-nums;}
+  .stat-timer.active{background:rgba(212,175,55,.15);border-color:rgba(212,175,55,.4);}
+  .stat-timer.active .t-val{color:var(--gold);}
+  .stat-timer.you{align-items:center;}
+
+  .table{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+
+  .opp-area{padding:16px 12px 6px;text-align:center;position:relative;transition:.4s;}
+  .opp-area.active::after,.you-area.active::after{
+    content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:280px;height:130px;border-radius:50%;pointer-events:none;z-index:-1;
+    background:radial-gradient(ellipse,rgba(212,175,55,.22),transparent 70%);
+    animation:breathe 2.4s ease-in-out infinite;
+  }
+  @keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
+  .opp-name{font-size:14px;opacity:.85;margin-bottom:10px;font-weight:500;letter-spacing:.03em;}
+  .opp-hand{display:flex;justify-content:center;min-height:78px;}
+
+  .center{flex:1;display:flex;align-items:center;justify-content:center;gap:30px;position:relative;}
+  .center::before{
+    content:"";position:absolute;width:200px;height:200px;border-radius:50%;
+    border:1px solid rgba(212,175,55,.12);box-shadow:0 0 0 14px rgba(212,175,55,.05);
+  }
+  .pile-label{position:absolute;top:-24px;left:50%;transform:translateX(-50%);
+    font-size:10px;opacity:.5;letter-spacing:.22em;white-space:nowrap;color:var(--gold-soft);text-transform:uppercase;}
+  .deck-stack,.discard-stack{position:relative;}
+  .deck-stack{cursor:pointer;transition:transform .15s;}
+  .deck-stack:active{transform:scale(.95);}
+  .deck-stack::before,.deck-stack::after{
+    content:"";position:absolute;inset:0;border-radius:9px;background:inherit;z-index:-1;
+  }
+  .discard-stack{display:flex;gap:6px;align-items:center;min-width:70px;justify-content:center;}
+
+  .you-area{padding:6px 8px 18px;position:relative;transition:.4s;}
+  .you-name{text-align:center;font-size:14px;opacity:.85;margin-bottom:6px;font-weight:500;}
+  .your-score{color:var(--gold);font-weight:700;}
+  .you-hand{display:flex;justify-content:center;align-items:flex-end;flex-wrap:wrap;
+    gap:8px;min-height:104px;padding:0 6px;}
+
+  /* ===== CARDS ===== */
+  .card{
+    width:64px;height:92px;border-radius:9px;position:relative;
+    box-shadow:0 4px 10px var(--shadow),0 1px 2px rgba(0,0,0,.3);
+    flex-shrink:0;transition:transform .2s cubic-bezier(.2,.8,.3,1.2),box-shadow .2s;
+    background:#fdfbf4;
+  }
+  .card.sm{width:42px;height:62px;border-radius:7px;margin-right:-16px;}
+  .card.sm:first-child{margin-right:0;}
+  .card.back{
+    background:
+      linear-gradient(135deg,#9c2b2b,#7a1f1f),
+      repeating-linear-gradient(45deg,rgba(255,255,255,.08) 0 7px,transparent 7px 14px);
+    background-blend-mode:overlay;
+    border:2.5px solid #fdfbf4;
+    overflow:hidden;
+  }
+  .card.back::after{
+    content:"♦";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:rgba(212,175,55,.55);font-size:26px;
+    border:1px solid rgba(212,175,55,.4);border-radius:5px;margin:5px;
+  }
+  .card.sm.back::after{font-size:16px;margin:3px;}
+  .card.face{
+    border:1px solid #e2dcc8;display:flex;flex-direction:column;justify-content:space-between;
+    padding:5px 6px;font-family:'Frank Ruhl Libre',serif;font-weight:700;
+    background:linear-gradient(155deg,#ffffff,#f3ecd9);
+  }
+  .card.face::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(135deg,rgba(255,255,255,.7) 0%,transparent 35%,transparent 65%,rgba(0,0,0,.04) 100%);
+  }
+  .card.red{color:var(--red);}
+  .card.black{color:var(--ink);}
+  .card .corner{font-size:16px;line-height:1;z-index:1;}
+  .card.sm .corner{font-size:11px;}
+  .card .corner.bottom{align-self:flex-end;transform:rotate(180deg);}
+  .card .pip{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:32px;z-index:1;filter:drop-shadow(0 1px 1px rgba(0,0,0,.12));}
+  .card.sm .pip{font-size:20px;}
+
+  .you-hand .card{cursor:pointer;}
+  .you-hand .card:hover{transform:translateY(-8px);}
+  .you-hand .card.selected{
+    transform:translateY(-20px) scale(1.04);
+    box-shadow:0 14px 24px var(--shadow),0 0 0 3px var(--gold),0 0 18px rgba(212,175,55,.7);
+  }
+  .card.dealt{animation:dealin .45s cubic-bezier(.2,.9,.3,1.2) both;}
+  @keyframes dealin{
+    0%{transform:translateY(-60px) rotateY(180deg) rotate(-12deg);opacity:0}
+    60%{opacity:1}
+    100%{transform:none;opacity:1}
+  }
+  .card.flip{animation:flipIn .5s ease both;}
+  @keyframes flipIn{0%{transform:rotateY(90deg) scale(.9)}100%{transform:none}}
+
+  /* last-drawn card: persistent highlight so it's clear what was just added */
+  .you-hand .card.just-drawn{
+    box-shadow:0 8px 18px var(--shadow),0 0 0 3px var(--gold),0 0 22px rgba(212,175,55,.85);
+    animation:newGlow 1.6s ease-in-out infinite;
+  }
+  @keyframes newGlow{
+    0%,100%{box-shadow:0 8px 18px var(--shadow),0 0 0 3px var(--gold),0 0 16px rgba(212,175,55,.6)}
+    50%{box-shadow:0 8px 18px var(--shadow),0 0 0 3px var(--gold-soft),0 0 30px rgba(212,175,55,1)}
+  }
+  .card.just-drawn::after{
+    content:"חדש";position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));color:#3a2e08;
+    font-family:'Heebo';font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;
+    box-shadow:0 2px 6px rgba(0,0,0,.4);z-index:3;letter-spacing:.05em;
+    animation:tagPop .4s cubic-bezier(.2,.9,.3,1.6) both;
+  }
+  @keyframes tagPop{0%{transform:translateX(-50%) scale(0)}100%{transform:translateX(-50%) scale(1)}}
+
+  /* fly-in from deck (right side) or discard (center-left) into the hand */
+  .card.fly-deck{animation:flyDeck .6s cubic-bezier(.2,.8,.3,1.1) both;}
+  .card.fly-discard{animation:flyDiscard .6s cubic-bezier(.2,.8,.3,1.1) both;}
+  @keyframes flyDeck{
+    0%{transform:translate(-40vw,-32vh) rotate(180deg) scale(.7);opacity:0}
+    35%{opacity:1}
+    100%{transform:none;opacity:1}
+  }
+  @keyframes flyDiscard{
+    0%{transform:translate(40vw,-32vh) rotate(-160deg) scale(.7);opacity:0}
+    35%{opacity:1}
+    100%{transform:none;opacity:1}
+  }
+
+  /* ===== ACTIONS ===== */
+  .actions{display:flex;gap:10px;justify-content:center;padding:10px 12px 4px;flex-wrap:wrap;}
+  .act-btn{
+    font-family:'Heebo';font-weight:700;font-size:15px;padding:14px 24px;border:none;
+    border-radius:14px;cursor:pointer;transition:transform .1s,opacity .2s,box-shadow .2s;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold) 55%,var(--gold-deep));color:#3a2e08;
+    box-shadow:0 4px 0 var(--gold-dark),inset 0 1px 0 rgba(255,255,255,.5);
+    text-shadow:0 1px 0 rgba(255,255,255,.3);
+  }
+  .act-btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--gold-dark);}
+  .act-btn.yaniv{
+    background:linear-gradient(180deg,#f0625a,#c0392b 60%,#8d2018);color:#fff;
+    box-shadow:0 4px 0 #6e1810,inset 0 1px 0 rgba(255,255,255,.3);text-shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+  .act-btn.yaniv:not(:disabled){animation:yanivPulse 1.6s ease-in-out infinite;}
+  @keyframes yanivPulse{0%,100%{box-shadow:0 4px 0 #6e1810,0 0 10px rgba(231,76,60,.5)}
+    50%{box-shadow:0 4px 0 #6e1810,0 0 24px rgba(231,76,60,.95)}}
+  .act-btn:disabled{opacity:.3;pointer-events:none;animation:none;}
+  .act-btn.draw-discard{background:var(--glass);color:var(--cream);
+    box-shadow:0 4px 0 rgba(0,0,0,.3);border:1px solid rgba(212,175,55,.3);text-shadow:none;}
+
+  .hand-value{text-align:center;font-size:13px;opacity:.75;padding-bottom:4px;}
+  .hand-value b{color:var(--gold);font-size:18px;font-family:'Frank Ruhl Libre',serif;
+    text-shadow:0 0 12px rgba(212,175,55,.5);}
+
+  /* ===== TOAST / OVERLAY ===== */
+  .toast{
+    position:fixed;top:72px;left:50%;transform:translateX(-50%) translateY(-16px) scale(.95);
+    background:linear-gradient(180deg,rgba(20,40,32,.95),rgba(6,20,15,.95));
+    color:var(--cream);padding:13px 24px;border-radius:30px;
+    font-size:15px;font-weight:500;z-index:50;opacity:0;transition:.35s cubic-bezier(.2,.9,.3,1.3);
+    pointer-events:none;border:1px solid rgba(212,175,55,.5);max-width:90vw;text-align:center;
+    box-shadow:0 8px 30px rgba(0,0,0,.5);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0) scale(1);}
+
+  .overlay{
+    position:fixed;inset:0;background:rgba(2,12,8,.82);backdrop-filter:blur(6px);
+    z-index:40;display:none;align-items:center;justify-content:center;padding:24px;
+  }
+  .overlay.show{display:flex;animation:fadeIn .3s ease;}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .panel{
+    background:linear-gradient(160deg,#10503e,#072c21 70%);
+    border:1.5px solid var(--gold);border-radius:24px;padding:34px 28px;
+    width:min(420px,92vw);text-align:center;
+    box-shadow:0 24px 70px rgba(0,0,0,.7),inset 0 1px 0 rgba(212,175,55,.3);
+    max-height:86vh;overflow-y:auto;animation:panelIn .45s cubic-bezier(.2,.9,.3,1.3) both;position:relative;
+  }
+  @keyframes panelIn{from{transform:translateY(30px) scale(.92);opacity:0}to{transform:none;opacity:1}}
+  .panel h2{font-family:'Frank Ruhl Libre',serif;font-size:36px;margin-bottom:10px;
+    background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .panel p{font-size:16px;opacity:.92;line-height:1.6;margin-bottom:18px;}
+  .scorelist{text-align:right;margin:16px 0;font-size:15px;}
+  .scorelist .row{display:flex;justify-content:space-between;padding:10px 6px;
+    border-bottom:1px solid rgba(212,175,55,.18);}
+  .scorelist .row b{color:var(--gold);font-family:'Frank Ruhl Libre',serif;font-size:17px;}
+  .rules{text-align:right;font-size:14px;line-height:1.7;opacity:.92;}
+  .rules li{margin-bottom:8px;margin-right:18px;}
+
+  @media(max-width:380px){
+    .card{width:54px;height:78px;}
+    .card .corner{font-size:14px;}
+    .card .pip{font-size:26px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- MENU -->
+<div class="screen active" id="menu">
+  <div class="suit-bg" id="suitBg"></div>
+  <div class="logo">יָנִיב</div>
+  <div class="tagline">משחק הקלפים</div>
+  <div class="menu-btns">
+    <button class="btn" onclick="openSettings('cpu')">🤖 שחק מול המחשב</button>
+    <button class="btn" onclick="openSettings('online')">🌐 שחק מול חבר (אונליין)</button>
+    <button class="btn ghost" onclick="showRules()">📖 חוקי המשחק</button>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="screen" id="settings">
+  <h2>כללי המשחק</h2>
+  <div class="sub" id="settingsSub">בחר את הווריאציה שלך</div>
+
+  <div class="opt-row" id="difficultyRow" style="display:none;">
+    <div class="q">רמת קושי של המחשב<span class="why">קשה: המחשב יחכה לעיתים לפני קריאת יניב ומושך קלפים שמשלימים לו צירופים</span></div>
+    <div class="seg" data-key="difficulty">
+      <button data-v="easy" onclick="selectSeg(this)">קל</button>
+      <button data-v="medium" onclick="selectSeg(this)">בינוני</button>
+      <button data-v="hard" onclick="selectSeg(this)">קשה</button>
+    </div>
+  </div>
+
+  <div class="opt-row">
+    <div class="q">קלפים בפתיחה<span class="why">כמה קלפים כל שחקן מקבל בתחילת סיבוב</span></div>
+    <div class="seg" data-key="startCards">
+      <button data-v="5" onclick="selectSeg(this)">5 קלפים</button>
+      <button data-v="7" onclick="selectSeg(this)">7 קלפים</button>
+    </div>
+  </div>
+
+  <div class="opt-row">
+    <div class="q">סף קריאת "יניב"<span class="why">הערך המרבי של היד כדי לקרוא יניב</span></div>
+    <div class="seg" data-key="yanivLimit">
+      <button data-v="5" onclick="selectSeg(this)">עד 5</button>
+      <button data-v="7" onclick="selectSeg(this)">עד 7</button>
+    </div>
+  </div>
+
+  <div class="opt-row">
+    <div class="q">קנס "אסף"<span class="why">תוספת נקודות לקורא שנתפס באסף</span></div>
+    <div class="seg" data-key="assafPenalty">
+      <button data-v="15" onclick="selectSeg(this)">15 נק'</button>
+      <button data-v="30" onclick="selectSeg(this)">30 נק'</button>
+      <button data-v="50" onclick="selectSeg(this)">50 נק'</button>
+    </div>
+  </div>
+
+  <div class="opt-row">
+    <div class="q">ניקוד הפסד<span class="why">מי שמגיע לערך הזה — מפסיד את המשחק</span></div>
+    <div class="seg" data-key="loseScore">
+      <button data-v="100" onclick="selectSeg(this)">100 נק'</button>
+      <button data-v="200" onclick="selectSeg(this)">200 נק'</button>
+    </div>
+  </div>
+
+  <div class="opt-row">
+    <div class="q">חצי-ניקוד במספר עגול<span class="why">הגעת בדיוק ל-50/100 → הניקוד נחתך לחצי (וריאציה פופולרית)</span></div>
+    <div class="seg" data-key="halveOnRound">
+      <button data-v="off" onclick="selectSeg(this)">כבוי</button>
+      <button data-v="on" onclick="selectSeg(this)">פעיל</button>
+    </div>
+  </div>
+
+  <div class="opt-row">
+    <div class="q">סידור קלפים לפי סדרות<span class="why">מקבץ יחד קלפים שניתן להשליך כצירוף (סדרה או רצף), במקום סידור לפי שווי בלבד</span></div>
+    <div class="seg" data-key="sortByCombos">
+      <button data-v="off" onclick="selectSeg(this)">לפי שווי</button>
+      <button data-v="on" onclick="selectSeg(this)">לפי סדרות</button>
+    </div>
+  </div>
+
+  <button class="btn" style="width:min(420px,90vw);margin-top:8px;" onclick="confirmSettings()">התחל משחק</button>
+  <button class="btn ghost" style="width:min(420px,90vw);margin-top:12px;" onclick="showScreen('menu')">חזרה</button>
+</div>
+
+<div class="screen setup" id="online">
+  <h2>משחק אונליין</h2>
+  <div id="sbConfig">
+    <div class="field">
+      <label>Supabase URL</label>
+      <input id="sbUrl" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off">
+    </div>
+    <div class="field">
+      <label>Supabase anon key</label>
+      <input id="sbKey" placeholder="eyJhbGci..." autocapitalize="off" autocorrect="off">
+    </div>
+    <p class="hint">צריך טבלה בשם <b>yaniv_games</b>. לחץ "הצג SQL" לקבלת הסקריפט.</p>
+    <button class="btn ghost" onclick="showSql()" style="width:100%;margin-bottom:10px;">📋 הצג SQL להקמת הטבלה</button>
+  </div>
+  <div class="field">
+    <label>השם שלך</label>
+    <input id="pName" placeholder="השם שלך" maxlength="12">
+  </div>
+  <div style="display:flex;gap:10px;width:min(380px,88vw);">
+    <button class="btn" style="flex:1" onclick="createRoom()">צור חדר</button>
+    <button class="btn ghost" style="flex:1" onclick="showJoin()">הצטרף לחדר</button>
+  </div>
+  <div id="joinBox" style="display:none;" class="field">
+    <label>קוד חדר</label>
+    <input id="joinCode" placeholder="ABCD" maxlength="4" style="text-transform:uppercase;text-align:center;letter-spacing:.3em;font-size:24px;">
+    <button class="btn" style="width:100%;margin-top:10px;" onclick="joinRoom()">הצטרף</button>
+  </div>
+  <div id="roomDisplay" style="display:none;text-align:center;">
+    <p class="hint">שתף את הקוד עם החבר:</p>
+    <div class="room-code" id="roomCodeText">----</div>
+  </div>
+  <div class="status" id="onlineStatus"></div>
+  <button class="btn ghost" style="width:min(380px,88vw);" onclick="leaveAndMenu()">חזרה לתפריט</button>
+</div>
+
+<!-- GAME -->
+<div class="screen" id="game">
+  <div class="topbar">
+    <button class="ico" onclick="quitGame()">✕</button>
+    <div class="turn-pill" id="turnPill">תורך</div>
+    <button class="ico" onclick="showRules()">?</button>
+  </div>
+  <div class="statbar">
+    <div class="stat-timer" id="timerOpp"><span class="t-name" id="timerOppName">יריב</span><span class="t-val" id="timerOppVal">0:00</span></div>
+    <div class="stat-round">סיבוב <b id="roundNum">1</b></div>
+    <div class="stat-timer you" id="timerYou"><span class="t-name">אתה</span><span class="t-val" id="timerYouVal">0:00</span></div>
+  </div>
+  <div class="table">
+    <div class="opp-area">
+      <div class="opp-name" id="oppName">יריב</div>
+      <div class="opp-hand" id="oppHand"></div>
+    </div>
+    <div class="center">
+      <div class="discard-stack" id="discardStack" onclick="onDiscardClick()">
+        <div class="pile-label">ערימת השלכה</div>
+      </div>
+      <div class="deck-stack" id="deckStack" onclick="drawFromDeck()">
+        <div class="pile-label">חפיסה</div>
+        <div class="card back"></div>
+      </div>
+    </div>
+    <div class="you-area">
+      <div class="you-name"><span id="youName">אתה</span> · <span class="your-score" id="youScoreLbl"></span></div>
+      <div class="hand-value">סך היד: <b id="handVal">0</b></div>
+      <div class="you-hand" id="youHand"></div>
+      <div class="actions" id="actions">
+        <button class="act-btn yaniv" id="btnYaniv" onclick="callYaniv()">יָנִיב!</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="overlay" id="overlay"><div class="panel" id="panel"></div></div>
+
+<script>
+/* ============ CARD MODEL ============ */
+const SUITS=['♠','♥','♦','♣'];
+const SUIT_COLOR={'♠':'black','♣':'black','♥':'red','♦':'red'};
+const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+function cardValue(r){ if(r==='A')return 1; if(['J','Q','K'].includes(r))return 10; return parseInt(r); }
+function buildDeck(){
+  let d=[];
+  for(const s of SUITS) for(const r of RANKS) d.push({s,r,id:s+r+Math.random().toString(36).slice(2,6)});
+  // two jokers
+  d.push({s:'★',r:'JOKER',id:'jk1'}); d.push({s:'★',r:'JOKER',id:'jk2'});
+  return d;
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function cVal(c){ return c.r==='JOKER'?0:cardValue(c.r); }
+function handTotal(h){ return h.reduce((s,c)=>s+cVal(c),0); }
+
+/* ===== display sorting (does not affect game logic) ===== */
+const SUIT_ORDER={'♠':0,'♣':1,'♥':2,'♦':3,'★':4}; // black first, then red
+// default: ascending by value, grouped by suit
+function sortByValue(hand){
+  return hand.slice().sort((a,b)=>{
+    if(cVal(a)!==cVal(b)) return cVal(a)-cVal(b);
+    return (SUIT_ORDER[a.s]??9)-(SUIT_ORDER[b.s]??9);
+  });
+}
+// group cards that form layable combos (sets/runs) together, combos first
+function sortByCombos(hand){
+  const remaining=hand.slice();
+  const groups=[];
+  // greedily extract the largest-value valid combos of size>=2
+  while(true){
+    const sets=allValidSets(remaining).filter(s=>s.length>=2);
+    if(sets.length===0) break;
+    // prefer the combo with the most cards, then highest point value
+    sets.sort((a,b)=> b.length-a.length || (b.reduce((s,c)=>s+cVal(c),0)-a.reduce((s,c)=>s+cVal(c),0)) );
+    const pick=sets[0];
+    // order within a run by rank; within a set by suit
+    const sorted=pick.slice().sort((a,b)=> (RANKS.indexOf(a.r)-RANKS.indexOf(b.r)) || ((SUIT_ORDER[a.s]??9)-(SUIT_ORDER[b.s]??9)) );
+    groups.push(sorted);
+    sorted.forEach(c=>{ const i=remaining.findIndex(x=>x.id===c.id); if(i>=0) remaining.splice(i,1); });
+  }
+  // leftover singles, sorted by value ascending
+  const leftovers=sortByValue(remaining);
+  return [].concat(...groups, leftovers);
+}
+function sortedHand(hand){
+  return RULES.sortByCombos ? sortByCombos(hand) : sortByValue(hand);
+}
+
+/* render a single card element */
+function cardEl(c,{small=false,faceDown=false}={}){
+  const d=document.createElement('div');
+  d.className='card'+(small?' sm':'');
+  if(faceDown){ d.classList.add('back'); return d; }
+  d.classList.add('face');
+  if(c.r==='JOKER'){
+    d.classList.add('red');
+    d.innerHTML=`<div class="corner">★</div><div class="pip" style="font-size:${small?'16px':'22px'}">JOKER</div><div class="corner bottom">★</div>`;
+    d.querySelector('.pip').style.fontSize=small?'10px':'14px';
+    return d;
+  }
+  d.classList.add(SUIT_COLOR[c.s]);
+  d.innerHTML=`<div class="corner">${c.r}<br>${c.s}</div><div class="pip">${c.s}</div><div class="corner bottom">${c.r}<br>${c.s}</div>`;
+  return d;
+}
+
+/* ============ VALID DISCARD SETS ============ */
+// returns true if the selected cards form a legal discard:
+// single card, a set (same rank, 2+), or a run (same suit, consecutive, 3+)
+function isValidSet(cards){
+  if(cards.length===0) return false;
+  if(cards.length===1) return true;
+  const jokers=cards.filter(c=>c.r==='JOKER');
+  const real=cards.filter(c=>c.r!=='JOKER');
+  // SET: same rank
+  if(real.length>0 && real.every(c=>c.r===real[0].r)) return true;
+  // RUN: same suit, consecutive (>=3), jokers fill gaps
+  if(real.length>=2){
+    const suit=real[0].s;
+    if(real.every(c=>c.s===suit)){
+      const order=RANKS.indexOf.bind(RANKS);
+      const idx=real.map(c=>RANKS.indexOf(c.r)).sort((a,b)=>a-b);
+      // no dup ranks
+      if(new Set(idx).size!==idx.length) return false;
+      let gaps=0;
+      for(let i=1;i<idx.length;i++) gaps+=(idx[i]-idx[i-1]-1);
+      if(gaps<=jokers.length && cards.length>=3) return true;
+    }
+  }
+  return false;
+}
+
+/* ============ GAME STATE ============ */
+let G=null;          // game state object
+let MODE=null;       // 'cpu' | 'online'
+let selected=new Set();
+// Default rules; overridden by settings screen / synced in online mode
+let RULES={
+  startCards:7,    // 5 or 7
+  yanivLimit:7,    // 5 or 7
+  assafPenalty:15, // 15, 30 or 50
+  loseScore:200,   // 100 or 200
+  slapdown:false,  // pickup-and-discard same card combo (advanced) - off
+  halveOnRound:true, // reaching exactly 50/100 halves your score
+  difficulty:'medium', // easy | medium | hard (CPU only)
+  sortByCombos:false // arrange hand grouping layable sets/runs together
+};
+function applyRulesFrom(state){ if(state&&state.rules) RULES={...RULES,...state.rules}; }
+
+function newRound(state){
+  const deck=shuffle(buildDeck());
+  state._animateDeal=true;
+  state.players.forEach(p=>{ p.hand=deck.splice(0,RULES.startCards); });
+  state.discard=[deck.splice(0,1)[0]];
+  state.deck=deck;
+  state.availableToTake=[state.discard[state.discard.length-1]]; // cards the current player may pick up
+  state.pendingDiscard=null;     // what current player just threw (becomes next player's availableToTake)
+  state.phase='action';
+  state.justDiscarded=null;
+}
+
+/* ============ UI HELPERS ============ */
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+/* ===== ROUND TIMER (per side, current round only) ===== */
+let clockSeconds=[0,0]; // [meIndex-relative? no: by player index]
+let clockTimer=null;
+function fmt(s){ const m=Math.floor(s/60); const ss=s%60; return m+':'+String(ss).padStart(2,'0'); }
+function resetClocks(){ clockSeconds=[0,0]; updateClockDisplay(); }
+function startClock(){
+  stopClock();
+  clockTimer=setInterval(()=>{
+    if(!G||G.gameOver) return;
+    clockSeconds[G.turn]=(clockSeconds[G.turn]||0)+1;
+    updateClockDisplay();
+  },1000);
+}
+function stopClock(){ if(clockTimer){ clearInterval(clockTimer); clockTimer=null; } }
+function updateClockDisplay(){
+  if(!G) return;
+  const meIdx=G.meIndex, oppIdx=1-meIdx;
+  const yv=document.getElementById('timerYouVal'), ov=document.getElementById('timerOppVal');
+  if(yv) yv.textContent=fmt(clockSeconds[meIdx]||0);
+  if(ov) ov.textContent=fmt(clockSeconds[oppIdx]||0);
+  const youT=document.getElementById('timerYou'), oppT=document.getElementById('timerOpp');
+  const oppName=document.getElementById('timerOppName');
+  if(oppName&&G.players[oppIdx]) oppName.textContent=G.players[oppIdx].name.replace(/🤖/,'').trim()||'יריב';
+  const myTurn=G.turn===meIdx && !G.gameOver;
+  if(youT) youT.classList.toggle('active',myTurn);
+  if(oppT) oppT.classList.toggle('active',!myTurn && !G.gameOver);
+}
+function updateRoundDisplay(){ const r=document.getElementById('roundNum'); if(r&&G) r.textContent=G.round||1; }
+
+/* ===== SETTINGS SCREEN ===== */
+let pendingMode=null; // 'cpu' (online uses settings before createRoom)
+function openSettings(mode){
+  pendingMode=mode;
+  document.getElementById('settingsSub').textContent =
+    mode==='cpu' ? 'בחר כללים — משחק מול המחשב' : 'בחר כללים — אתה המארח';
+  // difficulty only matters vs computer
+  document.getElementById('difficultyRow').style.display = mode==='cpu' ? 'block' : 'none';
+  // reflect current RULES on the segments
+  setSeg('difficulty',RULES.difficulty);
+  setSeg('startCards',RULES.startCards);
+  setSeg('yanivLimit',RULES.yanivLimit);
+  setSeg('assafPenalty',RULES.assafPenalty);
+  setSeg('loseScore',RULES.loseScore);
+  setSeg('halveOnRound',RULES.halveOnRound?'on':'off');
+  setSeg('sortByCombos',RULES.sortByCombos?'on':'off');
+  showScreen('settings');
+}
+function setSeg(key,val){
+  document.querySelectorAll(`.seg[data-key="${key}"] button`).forEach(b=>{
+    b.classList.toggle('on', b.dataset.v==String(val));
+  });
+}
+// called via inline onclick on each segment button
+function selectSeg(btn){
+  const seg=btn.closest('.seg'); const key=seg.dataset.key; const v=btn.dataset.v;
+  seg.querySelectorAll('button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  if(key==='halveOnRound') RULES.halveOnRound=(v==='on');
+  else if(key==='sortByCombos') RULES.sortByCombos=(v==='on');
+  else if(key==='difficulty') RULES.difficulty=v;
+  else RULES[key]=parseInt(v);
+}
+function confirmSettings(){
+  if(pendingMode==='cpu') startVsComputer();
+  else showScreen('online');
+}
+function toast(msg,ms=2200){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),ms); }
+function overlay(html){ document.getElementById('panel').innerHTML=html; document.getElementById('overlay').classList.add('show'); }
+function closeOverlay(){ document.getElementById('overlay').classList.remove('show'); }
+
+/* ============ RENDER TABLE ============ */
+function render(){
+  if(!G) return;
+  const me=G.players[G.meIndex];
+  const opp=G.players[1-G.meIndex];
+  document.getElementById('youName').textContent=me.name;
+  document.getElementById('oppName').textContent=opp.name+'  ('+opp.hand.length+' קלפים)';
+  document.getElementById('youScoreLbl').textContent='ניקוד: '+me.score+' · יריב: '+opp.score;
+
+  // opponent hand (face down)
+  const oh=document.getElementById('oppHand'); oh.innerHTML='';
+  opp.hand.forEach((c)=>{ oh.appendChild(cardEl(c,{small:true,faceDown:true})); });
+
+  // discard top
+  const ds=document.getElementById('discardStack');
+  ds.innerHTML='<div class="pile-label">ערימת השלכה</div>';
+  // show the cards the current player may pick up
+  const pickable = (G.phase==='draw' && G.pendingDiscard)
+    ? G.availableToTake                // mid-turn: still the opponent's old discard
+    : (G.availableToTake || [G.discard[G.discard.length-1]]);
+  pickable.forEach(c=>{ const e=cardEl(c); e.classList.add('flip'); ds.appendChild(e); });
+
+  // your hand (sorted for display only)
+  const yh=document.getElementById('youHand'); yh.innerHTML='';
+  sortedHand(me.hand).forEach((c,i)=>{
+    const e=cardEl(c);
+    if(selected.has(c.id)) e.classList.add('selected');
+    if(G._animateDeal){ e.classList.add('dealt'); e.style.animationDelay=(i*0.08)+'s'; }
+    if(c.id===G.lastDrawnId){
+      e.classList.add('just-drawn');
+      if(G._animateDraw==='deck') e.classList.add('fly-deck');
+      else if(G._animateDraw==='discard') e.classList.add('fly-discard');
+    }
+    e.onclick=()=>toggleSelect(c.id);
+    yh.appendChild(e);
+  });
+  G._animateDeal=false; G._animateDraw=null;
+  document.getElementById('handVal').textContent=handTotal(me.hand);
+
+  // turn pill + active-area glow
+  const myTurn=G.turn===G.meIndex;
+  const pill=document.getElementById('turnPill');
+  pill.textContent = G.gameOver ? 'נגמר' : (myTurn?'תורך':'תור היריב');
+  pill.className='turn-pill'+(myTurn?'':' theirs');
+  const youArea=document.querySelector('.you-area'), oppArea=document.querySelector('.opp-area');
+  if(youArea&&oppArea){
+    youArea.classList.toggle('active', myTurn && !G.gameOver);
+    oppArea.classList.toggle('active', !myTurn && !G.gameOver);
+  }
+
+  renderActions(myTurn);
+}
+
+function renderActions(myTurn){
+  const wrap=document.getElementById('actions');
+  wrap.innerHTML='';
+  const me=G.players[G.meIndex];
+
+  const yanivBtn=document.createElement('button');
+  yanivBtn.className='act-btn yaniv';
+  yanivBtn.textContent='יָנִיב!';
+  yanivBtn.disabled = !myTurn || handTotal(me.hand)>RULES.yanivLimit || G.phase!=='action';
+  yanivBtn.onclick=callYaniv;
+  wrap.appendChild(yanivBtn);
+
+  if(G.phase==='action' && myTurn){
+    // player must select cards then discard, then draw
+    const discardBtn=document.createElement('button');
+    discardBtn.className='act-btn';
+    discardBtn.textContent='השלך נבחרים';
+    discardBtn.disabled=selected.size===0||!isValidSet(selectedCards());
+    discardBtn.onclick=doDiscard;
+    wrap.appendChild(discardBtn);
+  }
+  if(G.phase==='draw' && myTurn){
+    const fromDeck=document.createElement('button');
+    fromDeck.className='act-btn';
+    fromDeck.textContent='🂠 משוך מהחפיסה';
+    fromDeck.onclick=drawFromDeck;
+    wrap.appendChild(fromDeck);
+    const fromDisc=document.createElement('button');
+    fromDisc.className='act-btn draw-discard';
+    fromDisc.textContent='♻ קח מההשלכה';
+    fromDisc.onclick=()=>drawFromDiscard();
+    wrap.appendChild(fromDisc);
+  }
+}
+
+function selectedCards(){ return G.players[G.meIndex].hand.filter(c=>selected.has(c.id)); }
+function toggleSelect(id){
+  if(G.turn!==G.meIndex||G.phase!=='action') return;
+  if(selected.has(id)) selected.delete(id); else selected.add(id);
+  render();
+}
+
+/* ============ TURN LOGIC ============ */
+// phases per turn: 'action' (select+discard or call yaniv) -> 'draw' (pick source) -> next player
+function startTurn(){
+  G.phase='action';
+  selected.clear();
+  render();
+  updateClockDisplay(); updateRoundDisplay();
+  if(MODE==='cpu' && G.turn!==G.meIndex){
+    setTimeout(cpuTurn,900);
+  }
+}
+
+function doDiscard(){
+  const cards=selectedCards();
+  if(!isValidSet(cards)) return toast('בחירה לא חוקית');
+  const me=G.players[G.meIndex];
+  me.hand=me.hand.filter(c=>!selected.has(c.id));
+  G.lastDrawnId=null; // clear last-drawn highlight once the player acts again
+  // these cards will become available for the OPPONENT after I finish drawing
+  G.pendingDiscard=cards.slice();
+  G.justDiscarded=cards.slice(); // for display on the pile
+  selected.clear();
+  G.phase='draw';
+  render();
+  if(MODE==='online') pushState();
+}
+
+// move whatever the player declined (the old availableToTake) onto the pile,
+// then promote this turn's discard to be the next player's availableToTake
+function settleDraw(){
+  if(G.availableToTake) G.availableToTake.forEach(c=>G.discard.push(c));
+  G.availableToTake = G.pendingDiscard ? G.pendingDiscard.slice() : [G.discard[G.discard.length-1]];
+  G.pendingDiscard=null;
+}
+
+function drawFromDeck(){
+  if(G.turn!==G.meIndex||G.phase!=='draw') return;
+  if(G.deck.length===0) reshuffle();
+  const c=G.deck.shift();
+  settleDraw();
+  G.players[G.meIndex].hand.push(c);
+  G.lastDrawnId=c.id; G._animateDraw='deck';
+  endTurn();
+}
+function drawFromDiscard(){
+  if(G.turn!==G.meIndex||G.phase!=='draw') return;
+  const opts=G.availableToTake;
+  if(!opts||opts.length===0){ return drawFromDeck(); }
+  if(opts.length===1){ takeDiscard(opts[0]); }
+  else {
+    const ends=[opts[0],opts[opts.length-1]];
+    overlay(`<h2>איזה קלף לקחת?</h2><p>אפשר לקחת אחד מקצוות הקבוצה שהיריב השליך</p>
+      <div style="display:flex;gap:14px;justify-content:center;margin-bottom:18px;" id="endChoice"></div>
+      <button class="btn ghost" style="width:100%" onclick="closeOverlay()">ביטול</button>`);
+    const box=document.getElementById('endChoice');
+    ends.forEach(c=>{ const e=cardEl(c); e.style.cursor='pointer'; e.onclick=()=>{ closeOverlay(); takeDiscard(c); }; box.appendChild(e); });
+  }
+}
+function takeDiscard(card){
+  // push the non-taken available cards to the pile, take the chosen one
+  G.availableToTake.forEach(c=>{ if(c.id!==card.id) G.discard.push(c); });
+  G.availableToTake=null;
+  // now promote my fresh discard for the opponent
+  G.availableToTake = G.pendingDiscard ? G.pendingDiscard.slice() : [G.discard[G.discard.length-1]];
+  G.pendingDiscard=null;
+  G.players[G.meIndex].hand.push(card);
+  G.lastDrawnId=card.id; G._animateDraw='discard';
+  endTurn();
+}
+function reshuffle(){
+  const top=G.discard.pop();
+  G.deck=shuffle(G.discard);
+  G.discard=[top];
+}
+function endTurn(){
+  G.turn=1-G.turn;
+  if(MODE==='online'){ pushState(); }
+  startTurn();
+}
+
+/* ============ YANIV / ASSAF ============ */
+function callYaniv(){
+  if(G.turn!==G.meIndex) return;
+  const me=G.players[G.meIndex];
+  const myTotal=handTotal(me.hand);
+  if(myTotal>RULES.yanivLimit) return toast('צריך '+RULES.yanivLimit+' או פחות כדי לקרוא יניב');
+  resolveYaniv(G.meIndex);
+}
+function resolveYaniv(callerIdx){
+  G.gameOver=true; // round over
+  stopClock();
+  const caller=G.players[callerIdx];
+  const other=G.players[1-callerIdx];
+  const callerTotal=handTotal(caller.hand);
+  const otherTotal=handTotal(other.hand);
+  let msg='';
+  if(otherTotal<=callerTotal){
+    // ASSAF! other player had equal or lower
+    caller.score+=RULES.assafPenalty+otherTotal; // standard: caller penalized
+    msg=`<h2 style="color:#e74c3c">אָסָף!</h2><p><b>${other.name}</b> היה עם ${otherTotal} מול ${callerTotal}.<br>${caller.name} מקבל קנס של ${RULES.assafPenalty}+${otherTotal} נקודות.</p>`;
+  } else {
+    // valid yaniv
+    other.score+=otherTotal;
+    msg=`<h2>יָנִיב!</h2><p><b>${caller.name}</b> ניצח את הסיבוב עם ${callerTotal}.<br>${other.name} מקבל ${otherTotal} נקודות.</p>`;
+  }
+  if(MODE==='online'){ G.roundResult={callerIdx,callerTotal,otherTotal}; }
+  // halve-on-round variation: landing EXACTLY on a multiple of half the
+  // lose-score (e.g. 50, 100, 150...) cuts your score in half
+  if(RULES.halveOnRound){
+    const mark=RULES.loseScore/2;
+    G.players.forEach(p=>{
+      if(p.score>0 && p.score % mark === 0 && p.score < RULES.loseScore){
+        p.score=p.score/2;
+        toast(p.name+' פגע ב-'+(p.score*2)+' — הניקוד נחצה ל-'+p.score+'!');
+      }
+    });
+  }
+  if(MODE==='online'){ pushState(); }
+  showRoundEnd(msg);
+}
+function showRoundEnd(msg){
+  const a=G.players[0],b=G.players[1];
+  const someoneLost = a.score>=RULES.loseScore||b.score>=RULES.loseScore;
+  overlay(`${msg}
+    <div class="scorelist">
+      <div class="row"><span>${a.name}</span><b>${a.score}</b></div>
+      <div class="row"><span>${b.name}</span><b>${b.score}</b></div>
+    </div>
+    <div style="font-size:12px;opacity:.6;margin:-6px 0 14px">⏱ זמן הסיבוב — ${a.name}: ${fmt(clockSeconds[0]||0)} · ${b.name}: ${fmt(clockSeconds[1]||0)}</div>
+    ${someoneLost
+      ? `<h2 style="font-size:24px">🏆 ${a.score<b.score?a.name:b.name} ניצח את המשחק!</h2>
+         <button class="btn" style="width:100%;margin-top:14px" onclick="fullRestart()">משחק חדש</button>`
+      : `<button class="btn" style="width:100%" onclick="nextRound()">הסיבוב הבא</button>`}
+  `);
+}
+function nextRound(){
+  closeOverlay();
+  G.gameOver=false; G.roundResult=null;
+  G.round=(G.round||1)+1;
+  resetClocks(); startClock();
+  // loser of round starts? standard: caller starts next. keep simple: alternate
+  newRound(G);
+  updateRoundDisplay();
+  // host controls deck in online; ensure sync
+  if(MODE==='online'){
+    if(G.iAmHost){ G.turn=0; pushState(); startTurn(); }
+  } else {
+    G.turn=G.meIndex; startTurn();
+  }
+}
+function fullRestart(){
+  closeOverlay();
+  if(MODE==='cpu') startVsComputer();
+  else leaveAndMenu();
+}
+
+/* ============ CPU AI ============ */
+function cpuTurn(){
+  if(G.gameOver) return;
+  const cpu=G.players[G.turn];
+  const diff=RULES.difficulty||'medium';
+  const total=handTotal(cpu.hand);
+
+  // ---- decide whether to call yaniv ----
+  if(total<=RULES.yanivLimit){
+    if(shouldCallYaniv(diff,total)) return resolveYaniv(G.turn);
+    // else: deliberately wait this turn to push the hand lower (esp. hard)
+  }
+
+  // ---- choose discard ----
+  const best = (diff==='easy') ? easyDiscard(cpu.hand) : bestDiscard(cpu.hand);
+  cpu.hand=cpu.hand.filter(c=>!best.includes(c));
+  G.pendingDiscard=best.slice();
+  G.justDiscarded=best.slice();
+
+  // ---- draw ----
+  const opts=G.availableToTake||[];
+  let drawn=null;
+  if(diff==='hard'){
+    // take a pile card if low OR it completes/extends a set or run
+    drawn = pickUsefulFromPile(cpu.hand, opts);
+  } else if(diff==='medium'){
+    const lowEnd=opts.slice().sort((a,b)=>cVal(a)-cVal(b))[0];
+    if(lowEnd && cVal(lowEnd)<=3) drawn=lowEnd;
+  } else { // easy: rarely takes from pile
+    const lowEnd=opts.slice().sort((a,b)=>cVal(a)-cVal(b))[0];
+    if(lowEnd && cVal(lowEnd)<=2 && Math.random()<0.4) drawn=lowEnd;
+  }
+
+  if(drawn){
+    G.availableToTake.forEach(c=>{ if(c.id!==drawn.id) G.discard.push(c); });
+    G.availableToTake=null;
+  } else {
+    if(G.deck.length===0) reshuffle();
+    drawn=G.deck.shift();
+    if(G.availableToTake) G.availableToTake.forEach(c=>G.discard.push(c));
+    G.availableToTake=null;
+  }
+  // promote CPU's discard so the human can pick it up next turn
+  G.availableToTake=G.pendingDiscard.slice();
+  G.pendingDiscard=null;
+  cpu.hand.push(drawn);
+  G.turn=1-G.turn;
+  startTurn();
+}
+
+// yaniv decision per difficulty
+function shouldCallYaniv(diff,total){
+  if(diff==='easy') return Math.random()<0.95; // greedy, almost always
+  if(diff==='medium') return Math.random()<0.85;
+  // hard: weigh assaf risk. The lower the hand, the safer to call.
+  // Estimate opponent could be low too; only call confidently when very low,
+  // and sometimes wait when 4-7 to push lower (so player can't read inaction).
+  if(total<=2) return true;                       // almost no assaf risk
+  if(total<=4) return Math.random()<0.7;
+  // total 5..limit: often wait to try to get lower
+  return Math.random()<0.35;
+}
+
+// easy AI: pick a random valid combo (frequently not the highest-value one)
+function easyDiscard(hand){
+  const sets=allValidSets(hand);
+  if(sets.length===0) return [hand[0]];
+  return sets[Math.floor(Math.random()*sets.length)];
+}
+
+// hard AI: from the available pile cards, take one that completes/extends a
+// set or run in hand, or is low value; otherwise return null (draw from deck)
+function pickUsefulFromPile(hand, opts){
+  if(!opts||opts.length===0) return null;
+  let bestCard=null, bestScore=-Infinity;
+  opts.forEach(c=>{
+    if(c.r==='JOKER'){ if(0>bestScore){bestScore=0;bestCard=c;} return; }
+    let score=-cVal(c)*0.3; // prefer low cards mildly
+    // same rank in hand? (helps a set)
+    const sameRank=hand.filter(h=>h.r===c.r).length;
+    if(sameRank>=1) score+=8+sameRank*4;
+    // adjacent same-suit in hand? (helps a run)
+    const idx=RANKS.indexOf(c.r);
+    const adj=hand.filter(h=>h.s===c.s && Math.abs(RANKS.indexOf(h.r)-idx)<=2).length;
+    if(adj>=1) score+=6+adj*3;
+    // very low card always somewhat useful to hold
+    if(cVal(c)<=2) score+=5;
+    if(score>bestScore){ bestScore=score; bestCard=c; }
+  });
+  // only take if it's clearly worthwhile; else draw blind
+  return bestScore>=5 ? bestCard : null;
+}
+
+// enumerate all valid discardable combos in a hand
+function allValidSets(hand){
+  let candidates=[];
+  const byRank={};
+  hand.forEach(c=>{ (byRank[c.r]=byRank[c.r]||[]).push(c); });
+  Object.values(byRank).forEach(g=>{ if(g.length>=1) candidates.push(g); });
+  const bySuit={};
+  hand.forEach(c=>{ if(c.r!=='JOKER'){(bySuit[c.s]=bySuit[c.s]||[]).push(c);} });
+  Object.values(bySuit).forEach(g=>{
+    g.sort((a,b)=>RANKS.indexOf(a.r)-RANKS.indexOf(b.r));
+    let run=[g[0]];
+    for(let i=1;i<g.length;i++){
+      if(RANKS.indexOf(g[i].r)===RANKS.indexOf(g[i-1].r)+1) run.push(g[i]);
+      else { if(run.length>=3)candidates.push(run.slice()); run=[g[i]]; }
+    }
+    if(run.length>=3) candidates.push(run);
+  });
+  hand.forEach(c=>candidates.push([c]));
+  return candidates.filter(isValidSet);
+}
+function bestDiscard(hand){
+  let best=null,bestSum=-1;
+  allValidSets(hand).forEach(set=>{
+    const sum=set.reduce((s,c)=>s+cVal(c),0);
+    if(sum>bestSum){bestSum=sum;best=set;}
+  });
+  return best||[hand[0]];
+}
+
+/* ============ START MODES ============ */
+function startVsComputer(){
+  MODE='cpu';
+  G={ players:[{name:'אתה',hand:[],score:0},{name:'מחשב 🤖',hand:[],score:0}],
+      meIndex:0, turn:0, deck:[], discard:[], gameOver:false, round:1, rules:{...RULES} };
+  newRound(G);
+  resetClocks(); startClock();
+  showScreen('game');
+  updateRoundDisplay(); updateClockDisplay();
+  const diffName={easy:'קל',medium:'בינוני',hard:'קשה'}[RULES.difficulty]||'בינוני';
+  toast('המשחק התחיל! · קושי: '+diffName);
+  startTurn();
+}
+function onDiscardClick(){ /* visual only */ }
+
+/* ============ SUPABASE ONLINE ============ */
+let sb=null, channel=null, ROOM=null;
+function showJoin(){ document.getElementById('joinBox').style.display='block'; }
+function showSql(){
+  overlay(`<h2>הקמת טבלה</h2><p style="font-size:13px">הרץ ב-Supabase SQL Editor:</p>
+  <pre style="text-align:left;direction:ltr;background:#000;padding:12px;border-radius:8px;font-size:11px;overflow:auto;white-space:pre-wrap;">create table yaniv_games (
+  code text primary key,
+  state jsonb,
+  updated_at timestamptz default now()
+);
+alter table yaniv_games enable row level security;
+create policy "all" on yaniv_games
+  for all using (true) with check (true);</pre>
+  <button class="btn" style="width:100%;margin-top:12px" onclick="closeOverlay()">סגור</button>`);
+}
+function initSb(){
+  const url=document.getElementById('sbUrl').value.trim();
+  const key=document.getElementById('sbKey').value.trim();
+  if(!url||!key){ toast('נא למלא URL ו-key'); return false; }
+  if(!sb) sb=supabase.createClient(url,key);
+  return true;
+}
+function rndCode(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<4;i++)s+=c[Math.floor(Math.random()*c.length)]; return s; }
+
+async function createRoom(){
+  if(!initSb()) return;
+  const name=document.getElementById('pName').value.trim()||'מארח';
+  ROOM=rndCode();
+  MODE='online';
+  G={ players:[{name,hand:[],score:0},{name:'מחכה...',hand:[],score:0}],
+      meIndex:0, iAmHost:true, turn:0, deck:[], discard:[], gameOver:false, started:false, rules:{...RULES} };
+  const {error}=await sb.from('yaniv_games').insert({code:ROOM,state:G});
+  if(error){ toast('שגיאה: '+error.message); return; }
+  document.getElementById('roomDisplay').style.display='block';
+  document.getElementById('roomCodeText').textContent=ROOM;
+  document.getElementById('onlineStatus').textContent='ממתין שחבר יצטרף...';
+  subscribe();
+}
+async function joinRoom(){
+  if(!initSb()) return;
+  const name=document.getElementById('pName').value.trim()||'אורח';
+  const code=document.getElementById('joinCode').value.trim().toUpperCase();
+  if(code.length<4){ toast('קוד לא תקין'); return; }
+  const {data,error}=await sb.from('yaniv_games').select('state').eq('code',code).single();
+  if(error||!data){ toast('חדר לא נמצא'); return; }
+  ROOM=code; MODE='online';
+  G=data.state;
+  G.meIndex=1; G.iAmHost=false;
+  applyRulesFrom(G); // adopt host's chosen rules
+  G.players[1].name=name;
+  // host deals
+  newRound(G);
+  G.turn=0; G.started=true; G.gameOver=false;
+  await pushState();
+  subscribe();
+  showScreen('game'); startTurn();
+  toast('הצטרפת! המשחק מתחיל');
+}
+async function pushState(){
+  if(!sb||!ROOM) return;
+  const payload={...G};
+  await sb.from('yaniv_games').update({state:payload,updated_at:new Date().toISOString()}).eq('code',ROOM);
+}
+function subscribe(){
+  channel=sb.channel('room-'+ROOM)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'yaniv_games',filter:'code=eq.'+ROOM},
+      payload=>{ applyRemote(payload.new.state); })
+    .subscribe();
+}
+function applyRemote(remote){
+  if(!remote) return;
+  const myIdx=G.meIndex, host=G.iAmHost, myName=G.players[myIdx].name;
+  G=remote;
+  applyRulesFrom(G);
+  G.meIndex=myIdx; G.iAmHost=host; G.players[myIdx].name=myName;
+  if(G.started && document.getElementById('game').classList.contains('active')===false){
+    showScreen('game');
+    toast('היריב הצטרף!');
+  }
+  if(G.started) {
+    if(document.getElementById('overlay').classList.contains('show') && !G.gameOver) closeOverlay();
+    if(G.gameOver && G.roundResult){
+      const {callerIdx,callerTotal,otherTotal}=G.roundResult;
+      const caller=G.players[callerIdx], other=G.players[1-callerIdx];
+      let msg = otherTotal<=callerTotal
+        ? `<h2 style="color:#e74c3c">אָסָף!</h2><p>${other.name} (${otherTotal}) ≤ ${caller.name} (${callerTotal})</p>`
+        : `<h2>יָנִיב!</h2><p>${caller.name} ניצח עם ${callerTotal}</p>`;
+      showRoundEnd(msg);
+    }
+    render();
+  }
+}
+function leaveAndMenu(){
+  stopClock();
+  if(channel&&sb) sb.removeChannel(channel);
+  channel=null; ROOM=null; G=null; MODE=null;
+  document.getElementById('roomDisplay').style.display='none';
+  document.getElementById('joinBox').style.display='none';
+  document.getElementById('onlineStatus').textContent='';
+  showScreen('menu');
+}
+
+/* ============ MISC ============ */
+function quitGame(){
+  stopClock();
+  if(MODE==='online'){ leaveAndMenu(); return; }
+  G=null; MODE=null; showScreen('menu');
+}
+function showRules(){
+  overlay(`<h2>חוקי יניב</h2>
+   <ul class="rules">
+     <li>כל שחקן מקבל ${RULES.startCards} קלפים. המטרה: להוריד את ערך היד.</li>
+     <li>בכל תור: <b>משליכים</b> קלף בודד / סדרה (אותו ערך) / רצף (אותה צורה, 3+ רצופים), ואז <b>מושכים</b> קלף — מהחפיסה, או את הקלף שהיריב השליך בתורו הקודם (מופיע בערימת ההשלכה).</li>
+     <li>אפשר לקרוא <b>"יניב"</b> כשערך היד הוא ${RULES.yanivLimit} או פחות.</li>
+     <li>אם ליריב יש ערך שווה או נמוך יותר → <b>"אסף"</b>: הקורא מקבל קנס של ${RULES.assafPenalty} + נקודות היריב.</li>
+     <li>אחרת — היריב מקבל את נקודות ידו.</li>
+     <li>A=1, J/Q/K=10, ג'וקר=0. מי שמגיע ל-${RULES.loseScore} נקודות — מפסיד.</li>
+   </ul>
+   <button class="btn" style="width:100%;margin-top:14px" onclick="closeOverlay()">הבנתי</button>`);
+}
+
+/* ===== floating suit symbols on menu ===== */
+(function(){
+  const bg=document.getElementById('suitBg'); if(!bg) return;
+  const suits=['♠','♥','♦','♣'];
+  for(let i=0;i<14;i++){
+    const s=document.createElement('span');
+    s.textContent=suits[i%4];
+    s.style.left=Math.random()*100+'%';
+    s.style.fontSize=(34+Math.random()*52)+'px';
+    s.style.animationDuration=(14+Math.random()*16)+'s';
+    s.style.animationDelay=(-Math.random()*20)+'s';
+    bg.appendChild(s);
+  }
+})();
+
+/* ===== PWA service worker ===== */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
