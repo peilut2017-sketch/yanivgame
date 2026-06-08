@@ -472,18 +472,7 @@
 
 <div class="screen setup" id="online">
   <h2>משחק אונליין</h2>
-  <div id="sbConfig">
-    <div class="field">
-      <label>Supabase URL</label>
-      <input id="sbUrl" placeholder="https://xxxx.supabase.co" autocapitalize="off" autocorrect="off">
-    </div>
-    <div class="field">
-      <label>Supabase anon key</label>
-      <input id="sbKey" placeholder="eyJhbGci..." autocapitalize="off" autocorrect="off">
-    </div>
-    <p class="hint">צריך טבלה בשם <b>yaniv_games</b>. לחץ "הצג SQL" לקבלת הסקריפט.</p>
-    <button class="btn ghost" onclick="showSql()" style="width:100%;margin-bottom:10px;">📋 הצג SQL להקמת הטבלה</button>
-  </div>
+  <div id="sbConfig" style="display:none;"></div>
   <div class="field">
     <label>השם שלך</label>
     <input id="pName" placeholder="השם שלך" maxlength="12">
@@ -1143,11 +1132,10 @@ create policy "all" on yaniv_games
   for all using (true) with check (true);</pre>
   <button class="btn" style="width:100%;margin-top:12px" onclick="closeOverlay()">סגור</button>`);
 }
+const SB_URL='https://qybjmdbegpaiqzssnosr.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5YmptZGJlZ3BhaXF6c3Nub3NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MDMwOTAsImV4cCI6MjA4OTE3OTA5MH0.6g4lgEHR6O-UIm7h7LjKMzTfClDpWHUhrzBpeS4gHlg';
 function initSb(){
-  const url=document.getElementById('sbUrl').value.trim();
-  const key=document.getElementById('sbKey').value.trim();
-  if(!url||!key){ toast('נא למלא URL ו-key'); return false; }
-  if(!sb) sb=supabase.createClient(url,key);
+  if(!sb) sb=supabase.createClient(SB_URL,SB_KEY);
   return true;
 }
 function rndCode(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<4;i++)s+=c[Math.floor(Math.random()*c.length)]; return s; }
