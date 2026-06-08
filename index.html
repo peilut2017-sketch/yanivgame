@@ -1150,6 +1150,7 @@ function initSb(){
 }
 function rndCode(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<4;i++)s+=c[Math.floor(Math.random()*c.length)]; return s; }
 
+let _hostPollTimer=null;
 async function createRoom(){
   if(!initSb()) return;
   showScreen('online');
@@ -1164,6 +1165,12 @@ async function createRoom(){
   document.getElementById('roomCodeText').textContent=ROOM;
   document.getElementById('onlineStatus').textContent='ממתין שחבר יצטרף...';
   subscribe();
+  // fallback poll in case realtime doesn't fire
+  _hostPollTimer=setInterval(async()=>{
+    if(!ROOM||!G||G.started) { clearInterval(_hostPollTimer); return; }
+    const {data}=await sb.from('yaniv_games').select('state').eq('code',ROOM).single();
+    if(data&&data.state&&data.state.started) applyRemote(data.state);
+  },2000);
 }
 async function joinRoom(){
   if(!initSb()) return;
@@ -1225,6 +1232,7 @@ function applyRemote(remote){
 }
 function leaveAndMenu(){
   stopClock();
+  clearInterval(_hostPollTimer);
   if(channel&&sb) sb.removeChannel(channel);
   channel=null; ROOM=null; G=null; MODE=null;
   document.getElementById('roomDisplay').style.display='none';
