@@ -408,7 +408,7 @@
   <div class="tagline">משחק הקלפים</div>
   <div class="menu-btns">
     <button class="btn" onclick="openSettings('cpu')">🤖 שחק מול המחשב</button>
-    <button class="btn" onclick="openSettings('online')">🌐 שחק מול חבר (אונליין)</button>
+    <button class="btn" onclick="showScreen('online')">🌐 שחק מול חבר (אונליין)</button>
     <button class="btn ghost" onclick="showRules()">📖 חוקי המשחק</button>
   </div>
 </div>
@@ -488,7 +488,7 @@
     <input id="pName" placeholder="השם שלך" maxlength="12">
   </div>
   <div style="display:flex;gap:10px;width:min(380px,88vw);">
-    <button class="btn" style="flex:1" onclick="createRoom()">צור חדר</button>
+    <button class="btn" style="flex:1" onclick="openSettings('online')">צור חדר</button>
     <button class="btn ghost" style="flex:1" onclick="showJoin()">הצטרף לחדר</button>
   </div>
   <div id="joinBox" style="display:none;" class="field">
@@ -733,7 +733,7 @@ function selectSeg(btn){
 }
 function confirmSettings(){
   if(pendingMode==='cpu') startVsComputer();
-  else showScreen('online');
+  else createRoom();
 }
 function toast(msg,ms=2200){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),ms); }
 function overlay(html){ document.getElementById('panel').innerHTML=html; document.getElementById('overlay').classList.add('show'); }
@@ -1152,6 +1152,7 @@ function rndCode(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(le
 
 async function createRoom(){
   if(!initSb()) return;
+  showScreen('online');
   const name=document.getElementById('pName').value.trim()||'מארח';
   ROOM=rndCode();
   MODE='online';
@@ -1201,9 +1202,13 @@ function applyRemote(remote){
   G=remote;
   applyRulesFrom(G);
   G.meIndex=myIdx; G.iAmHost=host; G.players[myIdx].name=myName;
-  if(G.started && document.getElementById('game').classList.contains('active')===false){
+  const wasStarted = document.getElementById('game').classList.contains('active');
+  if(G.started && !wasStarted){
     showScreen('game');
-    toast('היריב הצטרף!');
+    toast('היריב הצטרף! המשחק מתחיל');
+    resetClocks(); startClock();
+    startTurn();
+    return;
   }
   if(G.started) {
     if(document.getElementById('overlay').classList.contains('show') && !G.gameOver) closeOverlay();
