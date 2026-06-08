@@ -1189,13 +1189,23 @@ async function joinRoom(){
   G.turn=0; G.started=true; G.gameOver=false;
   await pushState();
   subscribe();
-  showScreen('game'); startTurn();
+  showScreen('game'); startTurn(); startGamePoll();
   toast('הצטרפת! המשחק מתחיל');
 }
 async function pushState(){
   if(!sb||!ROOM) return;
   const payload={...G};
   await sb.from('yaniv_games').update({state:payload,updated_at:new Date().toISOString()}).eq('code',ROOM);
+}
+let _gamePollTimer=null;
+function startGamePoll(){
+  clearInterval(_gamePollTimer);
+  _gamePollTimer=setInterval(async()=>{
+    if(!ROOM||!G||MODE!=='online') { clearInterval(_gamePollTimer); return; }
+    if(G.turn===G.meIndex && !G.gameOver) return; // my turn — no need to poll
+    const {data}=await sb.from('yaniv_games').select('state').eq('code',ROOM).single();
+    if(data&&data.state) applyRemote(data.state);
+  },500);
 }
 function subscribe(){
   channel=sb.channel('room-'+ROOM)
@@ -1214,7 +1224,7 @@ function applyRemote(remote){
     showScreen('game');
     toast('היריב הצטרף! המשחק מתחיל');
     resetClocks(); startClock();
-    startTurn();
+    startTurn(); startGamePoll();
     return;
   }
   if(G.started) {
@@ -1233,6 +1243,7 @@ function applyRemote(remote){
 function leaveAndMenu(){
   stopClock();
   clearInterval(_hostPollTimer);
+  clearInterval(_gamePollTimer);
   if(channel&&sb) sb.removeChannel(channel);
   channel=null; ROOM=null; G=null; MODE=null;
   document.getElementById('roomDisplay').style.display='none';
