@@ -384,6 +384,14 @@
   .rules{text-align:right;font-size:14px;line-height:1.7;opacity:.92;}
   .rules li{margin-bottom:8px;margin-right:18px;}
 
+  #oppsContainer{display:flex;flex-direction:column;gap:0;}
+  #oppsContainer .opp-area{padding:8px 12px 4px;text-align:center;position:relative;transition:.4s;}
+  #oppsContainer .opp-area.active::after{
+    content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:280px;height:90px;border-radius:50%;pointer-events:none;z-index:-1;
+    background:radial-gradient(ellipse,rgba(212,175,55,.22),transparent 70%);
+    animation:breathe 2.4s ease-in-out infinite;
+  }
   @media(max-width:430px){
     .card{width:52px;height:76px;}
     .card .corner{font-size:13px;}
@@ -485,6 +493,15 @@
     </div>
   </div>
 
+  <div class="opt-row">
+    <div class="q">כמות שחקנים<span class="why">כמה שחקנים משתתפים במשחק</span></div>
+    <div class="seg" data-key="playerCount">
+      <button data-v="2" onclick="selectSeg(this)">2</button>
+      <button data-v="3" onclick="selectSeg(this)">3</button>
+      <button data-v="4" onclick="selectSeg(this)">4</button>
+    </div>
+  </div>
+
   <button class="btn" style="width:min(420px,90vw);margin-top:8px;" onclick="confirmSettings()">התחל משחק</button>
   <button class="btn ghost" style="width:min(420px,90vw);margin-top:12px;" onclick="showScreen('menu')">חזרה</button>
 </div>
@@ -499,6 +516,20 @@
   <div style="display:flex;gap:10px;width:min(380px,88vw);">
     <button class="btn" style="flex:1" onclick="openSettings('online')">צור חדר</button>
     <button class="btn ghost" style="flex:1" onclick="showJoin()">הצטרף לחדר</button>
+  </div>
+  <div style="width:min(380px,88vw);text-align:center;margin:4px 0;opacity:.5;font-size:13px">— או —</div>
+  <div style="width:min(380px,88vw);">
+    <div class="q" style="font-size:14px;margin-bottom:8px;">כמות שחקנים לזירה:</div>
+    <div class="seg" data-key="lobbyCount" style="margin-bottom:10px;">
+      <button data-v="2" onclick="selectLobbyCount(this)" class="on">2</button>
+      <button data-v="3" onclick="selectLobbyCount(this)">3</button>
+      <button data-v="4" onclick="selectLobbyCount(this)">4</button>
+    </div>
+    <button class="btn" style="width:100%" onclick="enterMatchmaking()">⚔️ חפש משחק (זירה)</button>
+  </div>
+  <div id="lobbyStatus" style="display:none;text-align:center;">
+    <div class="status" id="lobbyStatusText">מחפש שחקנים...</div>
+    <button class="btn ghost" style="width:min(380px,88vw);margin-top:8px;" onclick="leaveLobby()">בטל חיפוש</button>
   </div>
   <div id="joinBox" style="display:none;" class="field">
     <label>קוד חדר</label>
@@ -526,10 +557,7 @@
     <div class="stat-timer you" id="timerYou"><span class="t-name">אתה</span><span class="t-val" id="timerYouVal">0:00</span></div>
   </div>
   <div class="table">
-    <div class="opp-area">
-      <div class="opp-name" id="oppName">יריב</div>
-      <div class="opp-hand" id="oppHand"></div>
-    </div>
+    <div id="oppsContainer"></div>
     <div class="center">
       <div class="discard-stack" id="discardStack" onclick="onDiscardClick()">
         <div class="pile-label">ערימת השלכה</div>
@@ -660,7 +688,8 @@ let RULES={
   halveOnRound:true, // reaching exactly 50/100 halves your score
   difficulty:'medium', // easy | medium | hard (CPU only)
   sortByCombos:false, // arrange hand grouping layable sets/runs together
-  soundHaptic:'both'  // 'off' | 'sound' | 'both'
+  soundHaptic:'both', // 'off' | 'sound' | 'both'
+  playerCount:2  // 2|3|4
 };
 function applyRulesFrom(state){ if(state&&state.rules) RULES={...RULES,...state.rules}; }
 
@@ -680,10 +709,10 @@ function newRound(state){
 function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
 /* ===== ROUND TIMER (per side, current round only) ===== */
-let clockSeconds=[0,0]; // [meIndex-relative? no: by player index]
+let clockSeconds=[];
 let clockTimer=null;
 function fmt(s){ const m=Math.floor(s/60); const ss=s%60; return m+':'+String(ss).padStart(2,'0'); }
-function resetClocks(){ clockSeconds=[0,0]; updateClockDisplay(); }
+function resetClocks(){ clockSeconds=new Array((G&&G.players)?G.players.length:2).fill(0); updateClockDisplay(); }
 function startClock(){
   stopClock();
   clockTimer=setInterval(()=>{
@@ -695,16 +724,19 @@ function startClock(){
 function stopClock(){ if(clockTimer){ clearInterval(clockTimer); clockTimer=null; } }
 function updateClockDisplay(){
   if(!G) return;
-  const meIdx=G.meIndex, oppIdx=1-meIdx;
-  const yv=document.getElementById('timerYouVal'), ov=document.getElementById('timerOppVal');
+  const meIdx=G.meIndex;
+  const yv=document.getElementById('timerYouVal');
   if(yv) yv.textContent=fmt(clockSeconds[meIdx]||0);
-  if(ov) ov.textContent=fmt(clockSeconds[oppIdx]||0);
+  const ov=document.getElementById('timerOppVal');
+  // show current player's time if not me
+  const curPlayer=G.players[G.turn];
+  if(ov) ov.textContent=fmt(clockSeconds[G.turn]||0);
+  const oppNameEl=document.getElementById('timerOppName');
+  if(oppNameEl&&curPlayer) oppNameEl.textContent=(G.turn===meIdx?'אתה':curPlayer.name.replace(/🤖/,'').trim()||'יריב');
   const youT=document.getElementById('timerYou'), oppT=document.getElementById('timerOpp');
-  const oppName=document.getElementById('timerOppName');
-  if(oppName&&G.players[oppIdx]) oppName.textContent=G.players[oppIdx].name.replace(/🤖/,'').trim()||'יריב';
-  const myTurn=G.turn===meIdx && !G.gameOver;
+  const myTurn=G.turn===meIdx&&!G.gameOver;
   if(youT) youT.classList.toggle('active',myTurn);
-  if(oppT) oppT.classList.toggle('active',!myTurn && !G.gameOver);
+  if(oppT) oppT.classList.toggle('active',!myTurn&&!G.gameOver);
 }
 function updateRoundDisplay(){ const r=document.getElementById('roundNum'); if(r&&G) r.textContent=G.round||1; }
 
@@ -725,6 +757,7 @@ function openSettings(mode){
   setSeg('halveOnRound',RULES.halveOnRound?'on':'off');
   setSeg('sortByCombos',RULES.sortByCombos?'on':'off');
   setSeg('soundHaptic',RULES.soundHaptic||'both');
+  setSeg('playerCount', RULES.playerCount||2);
   showScreen('settings');
 }
 function setSeg(key,val){
@@ -741,6 +774,7 @@ function selectSeg(btn){
   else if(key==='sortByCombos') RULES.sortByCombos=(v==='on');
   else if(key==='difficulty') RULES.difficulty=v;
   else if(key==='soundHaptic') RULES.soundHaptic=v;
+  else if(key==='playerCount') RULES.playerCount=parseInt(v);
   else RULES[key]=parseInt(v);
 }
 function confirmSettings(){
@@ -755,14 +789,28 @@ function closeOverlay(){ document.getElementById('overlay').classList.remove('sh
 function render(){
   if(!G) return;
   const me=G.players[G.meIndex];
-  const opp=G.players[1-G.meIndex];
   document.getElementById('youName').textContent=me.name;
-  document.getElementById('oppName').textContent=opp.name+'  ('+opp.hand.length+' קלפים)';
-  document.getElementById('youScoreLbl').textContent='ניקוד: '+me.score+' · יריב: '+opp.score;
+  const scoreStr=G.players.map(p=>(p===me?'אתה':p.name.replace(/🤖/,'').trim())+': '+p.score).join(' · ');
+  document.getElementById('youScoreLbl').textContent=scoreStr;
 
-  // opponent hand (face down)
-  const oh=document.getElementById('oppHand'); oh.innerHTML='';
-  opp.hand.forEach((c)=>{ oh.appendChild(cardEl(c,{small:true,faceDown:true})); });
+  // render all opponents dynamically
+  const container=document.getElementById('oppsContainer');
+  container.innerHTML='';
+  G.players.forEach((p,i)=>{
+    if(i===G.meIndex) return;
+    const isActive=G.turn===i&&!G.gameOver;
+    const div=document.createElement('div');
+    div.className='opp-area'+(isActive?' active':'');
+    const handDiv=document.createElement('div');
+    handDiv.className='opp-hand';
+    p.hand.forEach(()=>handDiv.appendChild(cardEl({r:'?',s:'?'},{small:true,faceDown:true})));
+    const nameDiv=document.createElement('div');
+    nameDiv.className='opp-name';
+    nameDiv.textContent=p.name+' ('+p.hand.length+' קלפים)';
+    div.appendChild(nameDiv);
+    div.appendChild(handDiv);
+    container.appendChild(div);
+  });
 
   // discard top
   const ds=document.getElementById('discardStack');
@@ -793,13 +841,11 @@ function render(){
   // turn pill + active-area glow
   const myTurn=G.turn===G.meIndex;
   const pill=document.getElementById('turnPill');
-  pill.textContent = G.gameOver ? 'נגמר' : (myTurn?'תורך':'תור היריב');
+  const curName=G.players[G.turn]?G.players[G.turn].name.replace(/🤖/,'').trim():'';
+  pill.textContent = G.gameOver ? 'נגמר' : (myTurn?'תורך':'תור '+curName);
   pill.className='turn-pill'+(myTurn?'':' theirs');
-  const youArea=document.querySelector('.you-area'), oppArea=document.querySelector('.opp-area');
-  if(youArea&&oppArea){
-    youArea.classList.toggle('active', myTurn && !G.gameOver);
-    oppArea.classList.toggle('active', !myTurn && !G.gameOver);
-  }
+  const youArea=document.querySelector('.you-area');
+  if(youArea) youArea.classList.toggle('active', myTurn && !G.gameOver);
 
   renderActions(myTurn);
 }
@@ -853,7 +899,8 @@ function startTurn(){
   selected.clear();
   render();
   updateClockDisplay(); updateRoundDisplay();
-  if(MODE==='cpu' && G.turn!==G.meIndex){
+  const humanIndices=G.humanIndices||[G.meIndex];
+  if(MODE==='cpu' && !humanIndices.includes(G.turn)){
     setTimeout(cpuTurn,900);
   }
 }
@@ -924,8 +971,8 @@ function reshuffle(){
   G.discard=[top];
 }
 function endTurn(){
-  G.turn=1-G.turn;
-  G.phase='action'; // ensure correct phase is pushed to remote
+  G.turn=(G.turn+1)%G.players.length;
+  G.phase='action';
   selected.clear();
   if(MODE==='online'){ pushState(); }
   startTurn();
@@ -940,29 +987,29 @@ function callYaniv(){
   resolveYaniv(G.meIndex);
 }
 function resolveYaniv(callerIdx){
-  G.gameOver=true; // round over
+  G.gameOver=true;
   stopClock();
   const caller=G.players[callerIdx];
-  const other=G.players[1-callerIdx];
   const callerTotal=handTotal(caller.hand);
-  const otherTotal=handTotal(other.hand);
+  const others=G.players.map((p,i)=>({p,i})).filter(x=>x.i!==callerIdx);
+  const assafers=others.filter(x=>handTotal(x.p.hand)<=callerTotal);
   let msg='';
-  if(otherTotal<=callerTotal){
+  if(assafers.length>0){
+    const best=assafers.reduce((a,b)=>handTotal(a.p.hand)<=handTotal(b.p.hand)?a:b);
+    const bestTotal=handTotal(best.p.hand);
+    caller.score+=RULES.assafPenalty+bestTotal;
     if(callerIdx===G.meIndex) sfxAssaf(); else sfxYaniv();
-    caller.score+=RULES.assafPenalty+otherTotal;
-    msg=`<h2 style="color:#e74c3c">אָסָף!</h2><p><b>${other.name}</b> היה עם ${otherTotal} מול ${callerTotal}.<br>${caller.name} מקבל קנס של ${RULES.assafPenalty}+${otherTotal} נקודות.</p>`;
+    msg=`<h2 style="color:#e74c3c">אָסָף!</h2><p>${assafers.map(x=>x.p.name).join(', ')} (${bestTotal}) ≤ ${caller.name} (${callerTotal}).<br>${caller.name} מקבל קנס של ${RULES.assafPenalty}+${bestTotal} נקודות.</p>`;
   } else {
+    others.forEach(x=>{ G.players[x.i].score+=handTotal(x.p.hand); });
     if(callerIdx===G.meIndex) sfxYaniv(); else sfxAssaf();
-    other.score+=otherTotal;
-    msg=`<h2>יָנִיב!</h2><p><b>${caller.name}</b> ניצח את הסיבוב עם ${callerTotal}.<br>${other.name} מקבל ${otherTotal} נקודות.</p>`;
+    msg=`<h2>יָנִיב!</h2><p><b>${caller.name}</b> ניצח עם ${callerTotal}.</p>`;
   }
-  if(MODE==='online'){ G.roundResult={callerIdx,callerTotal,otherTotal}; }
-  // halve-on-round variation: landing EXACTLY on a multiple of half the
-  // lose-score (e.g. 50, 100, 150...) cuts your score in half
+  if(MODE==='online'){ G.roundResult={callerIdx,callerTotal}; }
   if(RULES.halveOnRound){
     const mark=RULES.loseScore/2;
     G.players.forEach(p=>{
-      if(p.score>0 && p.score % mark === 0 && p.score < RULES.loseScore){
+      if(p.score>0&&p.score%mark===0&&p.score<RULES.loseScore){
         p.score=p.score/2;
         toast(p.name+' פגע ב-'+(p.score*2)+' — הניקוד נחצה ל-'+p.score+'!');
       }
@@ -972,16 +1019,15 @@ function resolveYaniv(callerIdx){
   showRoundEnd(msg);
 }
 function showRoundEnd(msg){
-  const a=G.players[0],b=G.players[1];
-  const someoneLost = a.score>=RULES.loseScore||b.score>=RULES.loseScore;
+  const someoneLost=G.players.some(p=>p.score>=RULES.loseScore);
+  const winner=G.players.reduce((a,b)=>a.score<b.score?a:b);
+  const scoreRows=G.players.map(p=>`<div class="row"><span>${p.name}</span><b>${p.score}</b></div>`).join('');
+  const me=G.players[G.meIndex];
   overlay(`${msg}
-    <div class="scorelist">
-      <div class="row"><span>${a.name}</span><b>${a.score}</b></div>
-      <div class="row"><span>${b.name}</span><b>${b.score}</b></div>
-    </div>
-    <div style="font-size:12px;opacity:.6;margin:-6px 0 14px">⏱ זמן הסיבוב — ${a.name}: ${fmt(clockSeconds[0]||0)} · ${b.name}: ${fmt(clockSeconds[1]||0)}</div>
+    <div class="scorelist">${scoreRows}</div>
+    <div style="font-size:12px;opacity:.6;margin:-6px 0 14px">⏱ הזמן שלך: ${fmt(clockSeconds[G.meIndex]||0)}</div>
     ${someoneLost
-      ? `<h2 style="font-size:24px">🏆 ${a.score<b.score?a.name:b.name} ניצח את המשחק!</h2>
+      ? `<h2 style="font-size:24px">🏆 ${winner.name} ניצח!</h2>
          <button class="btn" style="width:100%;margin-top:14px" onclick="fullRestart()">משחק חדש</button>`
       : `<button class="btn" style="width:100%" onclick="nextRound()">הסיבוב הבא</button>`}
   `);
@@ -1053,7 +1099,7 @@ function cpuTurn(){
   G.availableToTake=G.pendingDiscard.slice();
   G.pendingDiscard=null;
   cpu.hand.push(drawn);
-  G.turn=1-G.turn;
+  G.turn=(G.turn+1)%G.players.length;
   sfxNewCard();
   startTurn();
 }
@@ -1133,14 +1179,16 @@ function bestDiscard(hand){
 /* ============ START MODES ============ */
 function startVsComputer(){
   MODE='cpu';
-  G={ players:[{name:'אתה',hand:[],score:0},{name:'מחשב 🤖',hand:[],score:0}],
-      meIndex:0, turn:0, deck:[], discard:[], gameOver:false, round:1, rules:{...RULES} };
+  const n=RULES.playerCount||2;
+  const players=[{name:'אתה',hand:[],score:0}];
+  for(let i=1;i<n;i++) players.push({name:'מחשב'+(n>2?' '+i:'')+(n>2?'':'')+' 🤖',hand:[],score:0});
+  G={ players, meIndex:0, humanIndices:[0], turn:0, deck:[], discard:[], gameOver:false, round:1, rules:{...RULES} };
   newRound(G);
   resetClocks(); startClock();
   showScreen('game');
   updateRoundDisplay(); updateClockDisplay();
   const diffName={easy:'קל',medium:'בינוני',hard:'קשה'}[RULES.difficulty]||'בינוני';
-  toast('המשחק התחיל! · קושי: '+diffName);
+  toast('המשחק התחיל! · קושי: '+diffName+(n>2?' · '+n+' שחקנים':''));
   startTurn();
 }
 function onDiscardClick(){ /* visual only */ }
@@ -1149,7 +1197,7 @@ function onDiscardClick(){ /* visual only */ }
 let sb=null, channel=null, ROOM=null;
 function showJoin(){ document.getElementById('joinBox').style.display='block'; }
 function showSql(){
-  overlay(`<h2>הקמת טבלה</h2><p style="font-size:13px">הרץ ב-Supabase SQL Editor:</p>
+  overlay(`<h2>הקמת טבלאות</h2><p style="font-size:13px">הרץ ב-Supabase SQL Editor:</p>
   <pre style="text-align:left;direction:ltr;background:#000;padding:12px;border-radius:8px;font-size:11px;overflow:auto;white-space:pre-wrap;">create table yaniv_games (
   code text primary key,
   state jsonb,
@@ -1157,6 +1205,18 @@ function showSql(){
 );
 alter table yaniv_games enable row level security;
 create policy "all" on yaniv_games
+  for all using (true) with check (true);
+
+create table yaniv_lobby (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  player_count int,
+  room_code text,
+  player_index int,
+  created_at timestamptz default now()
+);
+alter table yaniv_lobby enable row level security;
+create policy "all" on yaniv_lobby
   for all using (true) with check (true);</pre>
   <button class="btn" style="width:100%;margin-top:12px" onclick="closeOverlay()">סגור</button>`);
 }
@@ -1173,21 +1233,27 @@ async function createRoom(){
   if(!initSb()) return;
   showScreen('online');
   const name=document.getElementById('pName').value.trim()||'מארח';
+  const n=RULES.playerCount||2;
   ROOM=rndCode();
   MODE='online';
-  G={ players:[{name,hand:[],score:0},{name:'מחכה...',hand:[],score:0}],
-      meIndex:0, iAmHost:true, turn:0, deck:[], discard:[], gameOver:false, started:false, rules:{...RULES} };
+  const players=[{name,hand:[],score:0}];
+  for(let i=1;i<n;i++) players.push({name:'מחכה...',hand:[],score:0});
+  G={ players, meIndex:0, iAmHost:true, humanIndices:Array.from({length:n},(_,i)=>i),
+      turn:0, deck:[], discard:[], gameOver:false, started:false, rules:{...RULES} };
   const {error}=await sb.from('yaniv_games').insert({code:ROOM,state:G});
   if(error){ toast('שגיאה: '+error.message); return; }
   document.getElementById('roomDisplay').style.display='block';
   document.getElementById('roomCodeText').textContent=ROOM;
-  document.getElementById('onlineStatus').textContent='ממתין שחבר יצטרף...';
+  document.getElementById('onlineStatus').textContent='ממתין שחברים יצטרפו... ('+1+'/'+n+')';
   subscribe();
-  // fallback poll in case realtime doesn't fire
   _hostPollTimer=setInterval(async()=>{
-    if(!ROOM||!G||G.started) { clearInterval(_hostPollTimer); return; }
+    if(!ROOM||!G||G.started){ clearInterval(_hostPollTimer); return; }
     const {data}=await sb.from('yaniv_games').select('state').eq('code',ROOM).single();
     if(data&&data.state&&data.state.started) applyRemote(data.state);
+    else if(data&&data.state){
+      const joined=data.state.players.filter(p=>p.name!=='מחכה...').length;
+      document.getElementById('onlineStatus').textContent='ממתין שחברים יצטרפו... ('+joined+'/'+n+')';
+    }
   },2000);
 }
 async function joinRoom(){
@@ -1199,16 +1265,28 @@ async function joinRoom(){
   if(error||!data){ toast('חדר לא נמצא'); return; }
   ROOM=code; MODE='online';
   G=data.state;
-  G.meIndex=1; G.iAmHost=false;
-  applyRulesFrom(G); // adopt host's chosen rules
-  G.players[1].name=name;
-  // host deals
-  newRound(G);
-  G.turn=0; G.started=true; G.gameOver=false;
-  await pushState();
-  subscribe();
-  showScreen('game'); startTurn(); startGamePoll();
-  toast('הצטרפת! המשחק מתחיל');
+  // find first empty slot
+  const slot=G.players.findIndex(p=>p.name==='מחכה...');
+  if(slot<0){ toast('החדר מלא'); return; }
+  G.meIndex=slot; G.iAmHost=false;
+  applyRulesFrom(G);
+  G.players[slot].name=name;
+  const n=G.players.length;
+  const allJoined=G.players.every(p=>p.name!=='מחכה...');
+  if(allJoined){
+    newRound(G);
+    G.turn=0; G.started=true; G.gameOver=false;
+    await pushState();
+    subscribe();
+    showScreen('game'); startTurn(); startGamePoll();
+    toast('כולם הצטרפו! המשחק מתחיל');
+  } else {
+    await pushState();
+    subscribe();
+    showScreen('online');
+    document.getElementById('onlineStatus').textContent='הצטרפת! ממתין לשאר השחקנים...';
+    startGamePoll();
+  }
 }
 let _lastSeenUpdatedAt=null;
 async function pushState(){
@@ -1243,34 +1321,37 @@ function applyRemote(remote){
   G=remote;
   applyRulesFrom(G);
   G.meIndex=myIdx; G.iAmHost=host; G.players[myIdx].name=myName;
-  const wasStarted = document.getElementById('game').classList.contains('active');
-  if(G.started && !wasStarted){
+  const gameActive=document.getElementById('game').classList.contains('active');
+  if(G.started && !gameActive){
     showScreen('game');
-    toast('היריב הצטרף! המשחק מתחיל');
+    toast('המשחק מתחיל!');
     resetClocks(); startClock();
     startTurn(); startGamePoll();
     return;
   }
-  if(G.started) {
+  if(G.started){
     if(G.gameOver && G.roundResult){
-      const {callerIdx,callerTotal,otherTotal}=G.roundResult;
-      const caller=G.players[callerIdx], other=G.players[1-callerIdx];
-      let msg = otherTotal<=callerTotal
-        ? `<h2 style="color:#e74c3c">אָסָף!</h2><p>${other.name} (${otherTotal}) ≤ ${caller.name} (${callerTotal})</p>`
+      const {callerIdx,callerTotal}=G.roundResult;
+      const caller=G.players[callerIdx];
+      const others=G.players.map((p,i)=>({p,i})).filter(x=>x.i!==callerIdx);
+      const assafers=others.filter(x=>handTotal(x.p.hand)<=callerTotal);
+      let msg=assafers.length>0
+        ? `<h2 style="color:#e74c3c">אָסָף!</h2><p>${assafers.map(x=>x.p.name).join(', ')} ≤ ${caller.name} (${callerTotal})</p>`
         : `<h2>יָנִיב!</h2><p>${caller.name} ניצח עם ${callerTotal}</p>`;
       if(!document.getElementById('overlay').classList.contains('show')) showRoundEnd(msg);
       return;
     }
-    if(document.getElementById('overlay').classList.contains('show') && !G.gameOver) closeOverlay();
-    // if it's now my turn (opponent just finished their turn) — properly start my turn
-    if(G.turn===G.meIndex && !G.gameOver){
-      startTurn();
-    } else {
-      render();
-    }
+    if(document.getElementById('overlay').classList.contains('show')&&!G.gameOver) closeOverlay();
+    if(G.turn===G.meIndex&&!G.gameOver){ startTurn(); } else { render(); }
+  } else {
+    // still waiting for players
+    const joined=G.players.filter(p=>p.name!=='מחכה...').length;
+    const total=G.players.length;
+    document.getElementById('onlineStatus').textContent='ממתין לשחקנים... ('+joined+'/'+total+')';
   }
 }
 function leaveAndMenu(){
+  leaveLobby();
   stopClock();
   clearInterval(_hostPollTimer);
   clearInterval(_gamePollTimer);
@@ -1280,6 +1361,74 @@ function leaveAndMenu(){
   document.getElementById('joinBox').style.display='none';
   document.getElementById('onlineStatus').textContent='';
   showScreen('menu');
+}
+
+/* ============ MATCHMAKING LOBBY ============ */
+let _lobbyPlayerCount=2;
+let _myLobbyId=null;
+let _lobbyPollTimer=null;
+function selectLobbyCount(btn){
+  document.querySelectorAll('.seg[data-key="lobbyCount"] button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  _lobbyPlayerCount=parseInt(btn.dataset.v);
+}
+async function enterMatchmaking(){
+  if(!initSb()) return;
+  const name=document.getElementById('pName').value.trim()||'שחקן';
+  document.getElementById('lobbyStatus').style.display='block';
+  document.getElementById('lobbyStatusText').textContent='מחפש '+_lobbyPlayerCount+' שחקנים...';
+  const {data,error}=await sb.from('yaniv_lobby').insert({name,player_count:_lobbyPlayerCount}).select().single();
+  if(error){ toast('שגיאה בכניסה לזירה: '+error.message); return; }
+  _myLobbyId=data.id;
+  _lobbyPollTimer=setInterval(async()=>{
+    const {data:rows}=await sb.from('yaniv_lobby').select('*').eq('player_count',_lobbyPlayerCount).is('room_code',null).order('created_at',{ascending:true});
+    if(!rows) return;
+    // check if my row got a room_code (assigned by another host)
+    const {data:myRow}=await sb.from('yaniv_lobby').select('*').eq('id',_myLobbyId).single();
+    if(myRow&&myRow.room_code){
+      clearInterval(_lobbyPollTimer);
+      await _lobbyJoinAsGuest(myRow.room_code, myRow.player_index, name);
+      return;
+    }
+    const waiting=rows.filter(r=>!r.room_code);
+    document.getElementById('lobbyStatusText').textContent='ממתין... ('+waiting.length+'/'+_lobbyPlayerCount+')';
+    if(waiting.length>=_lobbyPlayerCount){
+      const matched=waiting.slice(0,_lobbyPlayerCount);
+      if(matched[0].id!==_myLobbyId) return; // not my turn to host
+      clearInterval(_lobbyPollTimer);
+      // I'm the host — create room
+      ROOM=rndCode();
+      MODE='online';
+      const players=matched.map((r,i)=>({name:r.name,hand:[],score:0}));
+      G={ players, meIndex:0, iAmHost:true, humanIndices:matched.map((_,i)=>i),
+          turn:0, deck:[], discard:[], gameOver:false, started:false, rules:{...RULES} };
+      newRound(G); G.started=true;
+      const {error:err}=await sb.from('yaniv_games').insert({code:ROOM,state:G});
+      if(err){ toast('שגיאה ביצירת חדר: '+err.message); return; }
+      // update all lobby rows with room_code and player_index
+      await Promise.all(matched.map((r,i)=>sb.from('yaniv_lobby').update({room_code:ROOM,player_index:i}).eq('id',r.id)));
+      await sb.from('yaniv_lobby').delete().eq('id',_myLobbyId);
+      subscribe(); showScreen('game'); startTurn(); startGamePoll();
+      toast('נמצאו שחקנים! המשחק מתחיל');
+    }
+  },1500);
+}
+async function _lobbyJoinAsGuest(roomCode, playerIndex, name){
+  const {data,error}=await sb.from('yaniv_games').select('state').eq('code',roomCode).single();
+  if(error||!data){ toast('שגיאה בהצטרפות לזירה'); return; }
+  await sb.from('yaniv_lobby').delete().eq('id',_myLobbyId);
+  ROOM=roomCode; MODE='online';
+  G=data.state;
+  G.meIndex=playerIndex; G.iAmHost=false;
+  applyRulesFrom(G);
+  subscribe(); showScreen('game'); startTurn(); startGamePoll();
+  toast('נמצאו שחקנים! המשחק מתחיל');
+}
+async function leaveLobby(){
+  clearInterval(_lobbyPollTimer);
+  if(_myLobbyId&&sb) await sb.from('yaniv_lobby').delete().eq('id',_myLobbyId);
+  _myLobbyId=null;
+  if(document.getElementById('lobbyStatus')) document.getElementById('lobbyStatus').style.display='none';
 }
 
 /* ============ MISC ============ */
