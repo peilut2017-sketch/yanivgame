@@ -910,6 +910,8 @@ function reshuffle(){
 }
 function endTurn(){
   G.turn=1-G.turn;
+  G.phase='action'; // ensure correct phase is pushed to remote
+  selected.clear();
   if(MODE==='online'){ pushState(); }
   startTurn();
 }
@@ -1234,16 +1236,22 @@ function applyRemote(remote){
     return;
   }
   if(G.started) {
-    if(document.getElementById('overlay').classList.contains('show') && !G.gameOver) closeOverlay();
     if(G.gameOver && G.roundResult){
       const {callerIdx,callerTotal,otherTotal}=G.roundResult;
       const caller=G.players[callerIdx], other=G.players[1-callerIdx];
       let msg = otherTotal<=callerTotal
         ? `<h2 style="color:#e74c3c">אָסָף!</h2><p>${other.name} (${otherTotal}) ≤ ${caller.name} (${callerTotal})</p>`
         : `<h2>יָנִיב!</h2><p>${caller.name} ניצח עם ${callerTotal}</p>`;
-      showRoundEnd(msg);
+      if(!document.getElementById('overlay').classList.contains('show')) showRoundEnd(msg);
+      return;
     }
-    render();
+    if(document.getElementById('overlay').classList.contains('show') && !G.gameOver) closeOverlay();
+    // if it's now my turn (opponent just finished their turn) — properly start my turn
+    if(G.turn===G.meIndex && !G.gameOver){
+      startTurn();
+    } else {
+      render();
+    }
   }
 }
 function leaveAndMenu(){
