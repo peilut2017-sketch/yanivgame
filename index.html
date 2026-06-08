@@ -1312,7 +1312,11 @@ function startGamePoll(){
 function subscribe(){
   channel=sb.channel('room-'+ROOM)
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'yaniv_games',filter:'code=eq.'+ROOM},
-      payload=>{ applyRemote(payload.new.state); })
+      payload=>{
+        if(payload.new.updated_at===_lastSeenUpdatedAt) return; // own push, skip
+        _lastSeenUpdatedAt=payload.new.updated_at;
+        applyRemote(payload.new.state);
+      })
     .subscribe();
 }
 function applyRemote(remote){
@@ -1342,7 +1346,10 @@ function applyRemote(remote){
       return;
     }
     if(document.getElementById('overlay').classList.contains('show')&&!G.gameOver) closeOverlay();
-    if(G.turn===G.meIndex&&!G.gameOver){ startTurn(); } else { render(); }
+    if(G.turn===G.meIndex&&!G.gameOver){
+      if(G.phase==='draw') render(); // mid-turn: don't call startTurn() which resets phase to 'action'
+      else startTurn();
+    } else { render(); }
   } else {
     // still waiting for players
     const joined=G.players.filter(p=>p.name!=='מחכה...').length;
