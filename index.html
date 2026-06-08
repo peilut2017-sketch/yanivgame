@@ -1192,10 +1192,13 @@ async function joinRoom(){
   showScreen('game'); startTurn(); startGamePoll();
   toast('הצטרפת! המשחק מתחיל');
 }
+let _lastSeenUpdatedAt=null;
 async function pushState(){
   if(!sb||!ROOM) return;
+  const now=new Date().toISOString();
+  _lastSeenUpdatedAt=now;
   const payload={...G};
-  await sb.from('yaniv_games').update({state:payload,updated_at:new Date().toISOString()}).eq('code',ROOM);
+  await sb.from('yaniv_games').update({state:payload,updated_at:now}).eq('code',ROOM);
 }
 let _gamePollTimer=null;
 function startGamePoll(){
@@ -1203,8 +1206,11 @@ function startGamePoll(){
   _gamePollTimer=setInterval(async()=>{
     if(!ROOM||!G||MODE!=='online') { clearInterval(_gamePollTimer); return; }
     if(G.turn===G.meIndex && !G.gameOver) return; // my turn — no need to poll
-    const {data}=await sb.from('yaniv_games').select('state').eq('code',ROOM).single();
-    if(data&&data.state) applyRemote(data.state);
+    const {data}=await sb.from('yaniv_games').select('state,updated_at').eq('code',ROOM).single();
+    if(!data) return;
+    if(data.updated_at===_lastSeenUpdatedAt) return; // nothing changed
+    _lastSeenUpdatedAt=data.updated_at;
+    applyRemote(data.state);
   },500);
 }
 function subscribe(){
