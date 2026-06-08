@@ -476,6 +476,15 @@
     </div>
   </div>
 
+  <div class="opt-row">
+    <div class="q">צלילים ורטט<span class="why">אפקטים חושיים בעת בחירה, השלכה ומשיכת קלפים</span></div>
+    <div class="seg" data-key="soundHaptic">
+      <button data-v="off" onclick="selectSeg(this)">כבוי</button>
+      <button data-v="sound" onclick="selectSeg(this)">צלילים</button>
+      <button data-v="both" onclick="selectSeg(this)">שניהם</button>
+    </div>
+  </div>
+
   <button class="btn" style="width:min(420px,90vw);margin-top:8px;" onclick="confirmSettings()">התחל משחק</button>
   <button class="btn ghost" style="width:min(420px,90vw);margin-top:12px;" onclick="showScreen('menu')">חזרה</button>
 </div>
@@ -650,7 +659,8 @@ let RULES={
   slapdown:false,  // pickup-and-discard same card combo (advanced) - off
   halveOnRound:true, // reaching exactly 50/100 halves your score
   difficulty:'medium', // easy | medium | hard (CPU only)
-  sortByCombos:false // arrange hand grouping layable sets/runs together
+  sortByCombos:false, // arrange hand grouping layable sets/runs together
+  soundHaptic:'both'  // 'off' | 'sound' | 'both'
 };
 function applyRulesFrom(state){ if(state&&state.rules) RULES={...RULES,...state.rules}; }
 
@@ -714,6 +724,7 @@ function openSettings(mode){
   setSeg('loseScore',RULES.loseScore);
   setSeg('halveOnRound',RULES.halveOnRound?'on':'off');
   setSeg('sortByCombos',RULES.sortByCombos?'on':'off');
+  setSeg('soundHaptic',RULES.soundHaptic||'both');
   showScreen('settings');
 }
 function setSeg(key,val){
@@ -729,6 +740,7 @@ function selectSeg(btn){
   if(key==='halveOnRound') RULES.halveOnRound=(v==='on');
   else if(key==='sortByCombos') RULES.sortByCombos=(v==='on');
   else if(key==='difficulty') RULES.difficulty=v;
+  else if(key==='soundHaptic') RULES.soundHaptic=v;
   else RULES[key]=parseInt(v);
 }
 function confirmSettings(){
@@ -830,7 +842,7 @@ function renderActions(myTurn){
 function selectedCards(){ return G.players[G.meIndex].hand.filter(c=>selected.has(c.id)); }
 function toggleSelect(id){
   if(G.turn!==G.meIndex||G.phase!=='action') return;
-  if(selected.has(id)) selected.delete(id); else selected.add(id);
+  if(selected.has(id)){ selected.delete(id); sfxDeselect(); } else { selected.add(id); sfxSelect(); }
   render();
 }
 
@@ -849,6 +861,7 @@ function startTurn(){
 function doDiscard(){
   const cards=selectedCards();
   if(!isValidSet(cards)) return toast('בחירה לא חוקית');
+  sfxDiscard();
   const me=G.players[G.meIndex];
   me.hand=me.hand.filter(c=>!selected.has(c.id));
   G.lastDrawnId=null; // clear last-drawn highlight once the player acts again
@@ -876,6 +889,7 @@ function drawFromDeck(){
   settleDraw();
   G.players[G.meIndex].hand.push(c);
   G.lastDrawnId=c.id; G._animateDraw='deck';
+  sfxDraw();
   endTurn();
 }
 function drawFromDiscard(){
@@ -901,6 +915,7 @@ function takeDiscard(card){
   G.pendingDiscard=null;
   G.players[G.meIndex].hand.push(card);
   G.lastDrawnId=card.id; G._animateDraw='discard';
+  sfxDraw();
   endTurn();
 }
 function reshuffle(){
@@ -933,11 +948,11 @@ function resolveYaniv(callerIdx){
   const otherTotal=handTotal(other.hand);
   let msg='';
   if(otherTotal<=callerTotal){
-    // ASSAF! other player had equal or lower
-    caller.score+=RULES.assafPenalty+otherTotal; // standard: caller penalized
+    if(callerIdx===G.meIndex) sfxAssaf(); else sfxYaniv();
+    caller.score+=RULES.assafPenalty+otherTotal;
     msg=`<h2 style="color:#e74c3c">אָסָף!</h2><p><b>${other.name}</b> היה עם ${otherTotal} מול ${callerTotal}.<br>${caller.name} מקבל קנס של ${RULES.assafPenalty}+${otherTotal} נקודות.</p>`;
   } else {
-    // valid yaniv
+    if(callerIdx===G.meIndex) sfxYaniv(); else sfxAssaf();
     other.score+=otherTotal;
     msg=`<h2>יָנִיב!</h2><p><b>${caller.name}</b> ניצח את הסיבוב עם ${callerTotal}.<br>${other.name} מקבל ${otherTotal} נקודות.</p>`;
   }
@@ -1039,6 +1054,7 @@ function cpuTurn(){
   G.pendingDiscard=null;
   cpu.hand.push(drawn);
   G.turn=1-G.turn;
+  sfxNewCard();
   startTurn();
 }
 
@@ -1284,6 +1300,41 @@ function showRules(){
    </ul>
    <button class="btn" style="width:100%;margin-top:14px" onclick="closeOverlay()">הבנתי</button>`);
 }
+
+/* ===== SOUND & HAPTIC ENGINE ===== */
+let _actx=null;
+function getACtx(){ if(!_actx) _actx=new(window.AudioContext||window.webkitAudioContext)(); return _actx; }
+function playTone(freq,type,dur,vol,freqEnd){
+  if(!RULES.soundHaptic||RULES.soundHaptic==='off') return;
+  try{
+    const ctx=getACtx();
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type=type||'sine'; o.frequency.setValueAtTime(freq,ctx.currentTime);
+    if(freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd,ctx.currentTime+dur);
+    g.gain.setValueAtTime(vol||0.18,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
+    o.start(); o.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+function vibrate(pattern){
+  if(RULES.soundHaptic!=='both') return;
+  if(navigator.vibrate) navigator.vibrate(pattern);
+}
+function sfxSelect(){ playTone(520,'sine',0.07,0.12); vibrate(18); }
+function sfxDeselect(){ playTone(380,'sine',0.07,0.1); vibrate(10); }
+function sfxDiscard(){ playTone(340,'triangle',0.18,0.2,180); vibrate([20,10,20]); }
+function sfxDraw(){ playTone(600,'sine',0.12,0.15,700); vibrate(25); }
+function sfxYaniv(){
+  // short ascending fanfare
+  [523,659,784,1047].forEach((f,i)=>setTimeout(()=>playTone(f,'triangle',0.18,0.22),i*80));
+  vibrate([30,20,30,20,60]);
+}
+function sfxAssaf(){
+  playTone(220,'sawtooth',0.35,0.25,110);
+  vibrate([60,20,60,20,120]);
+}
+function sfxNewCard(){ playTone(660,'sine',0.1,0.13,720); vibrate(15); }
 
 /* ===== floating suit symbols on menu ===== */
 (function(){
