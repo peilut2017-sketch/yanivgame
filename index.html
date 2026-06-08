@@ -1292,9 +1292,9 @@ let _lastSeenUpdatedAt=null;
 async function pushState(){
   if(!sb||!ROOM) return;
   const now=new Date().toISOString();
-  _lastSeenUpdatedAt=now;
   const payload={...G};
   await sb.from('yaniv_games').update({state:payload,updated_at:now}).eq('code',ROOM);
+  _lastSeenUpdatedAt=now; // set AFTER DB confirms write, to avoid race with poll
 }
 let _gamePollTimer=null;
 function startGamePoll(){
