@@ -23,18 +23,18 @@
     --or1:#ffc15e; --or2:#f58a1f; --or3:#d2610a; --or-d:#8f3c05;
     --green:#62d24c; --green2:#34a22d; --red:#e5453a; --blue:#3fa9f5;
     --cream:#fff8e6; --ink:#1d2430;
-    --bg1:#58d3ea; --bg2:#1b9ccf;                      /* scene gradient (per theme) */
+    --bg1:#58d3ea; --bg2:#1b9ccf; --sand1:#f6d98a;--sand2:#e9b95a;--wat1:#8fe3d8;--wat2:#43b8d8;--jung:#2f8f3a;                      /* scene gradient (per theme) */
     --f1:#31a96c; --f2:#1b7a4a;                        /* felt (per theme) */
     --b1:#d6455a; --b2:#a52a40;                        /* card back */
     --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
     --stroke:0 2px 0 var(--or-d),2px 0 0 var(--or-d),-2px 0 0 var(--or-d),0 -2px 0 var(--or-d),2px 2px 0 var(--or-d),-2px -2px 0 var(--or-d),2px -2px 0 var(--or-d),-2px 2px 0 var(--or-d);
   }
-  body[data-theme="meadow"]{--bg1:#b5ec6d;--bg2:#4fb53a;--f1:#3b8fd8;--f2:#1d5fa8;}
-  body[data-theme="sunset"]{--bg1:#ffc27a;--bg2:#ff6f91;--f1:#a24fc9;--f2:#6a2b92;}
-  body[data-theme="night"]{--bg1:#4a52b8;--bg2:#171a4d;--f1:#4f6a8a;--f2:#2a3a52;}
+  body[data-theme="meadow"]{--sand1:#b9e87a;--sand2:#7cc24a;--wat1:#9fd8ff;--wat2:#4b9be0;--jung:#237a33;--bg1:#b5ec6d;--bg2:#4fb53a;--f1:#3b8fd8;--f2:#1d5fa8;}
+  body[data-theme="sunset"]{--sand1:#ffc58a;--sand2:#f58e7a;--wat1:#d7a4e8;--wat2:#8f62c8;--jung:#7a3a6a;--bg1:#ffc27a;--bg2:#ff6f91;--f1:#a24fc9;--f2:#6a2b92;}
+  body[data-theme="night"]{--sand1:#6a6fc0;--sand2:#454a9a;--wat1:#3a4a9a;--wat2:#1b2260;--jung:#1c2a5a;--bg1:#4a52b8;--bg2:#171a4d;--f1:#4f6a8a;--f2:#2a3a52;}
+  body[data-back="jungle"]{--b1:#58c14a;--b2:#2f8f2e;}
   body[data-back="ruby"]{--b1:#d6455a;--b2:#a52a40;}
   body[data-back="ocean"]{--b1:#3f8fe0;--b2:#1f5aa8;}
-  body[data-back="forest"]{--b1:#2fa66b;--b2:#17734a;}
   body[data-back="night"]{--b1:#7a5bd6;--b2:#4a2f9e;}
 
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -200,7 +200,7 @@
       repeating-linear-gradient(45deg,var(--b1) 0 calc(var(--cw)*.1),var(--b2) calc(var(--cw)*.1) calc(var(--cw)*.2));
     border-color:#fff;box-shadow:inset 0 0 0 calc(var(--cw)*.05) #fff,0 0 0 1.5px rgba(90,45,15,.5),0 6px 12px rgba(0,0,0,.3);}
   .card.back::before{inset:calc(var(--cw)*.09);border:1.5px solid rgba(255,255,255,.6);border-radius:calc(var(--cw)*.09);background:none}
-  .card.back::after{content:"י";position:absolute;inset:0;display:grid;place-items:center;font-weight:900;font-size:calc(var(--cw)*.42);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.3)}
+  .card.back::after{content:"YANIV!";position:absolute;left:50%;top:50%;width:calc(var(--cw)*1.2);text-align:center;transform:translate(-50%,-50%) rotate(-90deg);font-weight:900;font-size:calc(var(--cw)*.2);letter-spacing:.04em;color:#ffd23a;-webkit-text-stroke:calc(var(--cw)*.06) #1d5a1d;paint-order:stroke fill;white-space:nowrap}
   .ghost{will-change:transform;}
 
   /* ---------- GAME ---------- */
@@ -353,6 +353,41 @@
   .stat-grid span{font-size:11px;font-weight:700;opacity:.75}
   .rank-title{display:inline-block;background:linear-gradient(180deg,#f0594d,#c92f25);color:#fff;padding:3px 16px;border-radius:8px;border:2.5px solid #7a1710;font-weight:900;text-shadow:0 2px 0 #7a1710;margin-bottom:6px}
 
+  /* ----- beach table scene ----- */
+  #gscene{position:fixed;inset:0;z-index:0;display:none}
+  body:not(.scene) #gscene{display:block}
+  #gscene svg{width:100%;height:100%;display:block}
+  .felt{margin:0;padding-top:var(--ptop,0px)}
+  .felt::before{display:none}
+  .piles{flex-direction:column;gap:16px;align-items:center;display:flex}
+  .pile-lbl{display:none}
+  .deck .cnt{bottom:-8px}
+  #seats{position:absolute;inset:0;pointer-events:none;z-index:2}
+  .seat{position:absolute;width:112px;flex:none;max-width:none;background:none;border:none;box-shadow:none;padding:0;gap:0;transform:none!important;pointer-events:none}
+  .seat.pos-l{left:2px;top:12%}.seat.pos-r{right:2px;top:12%}.seat.pos-t{left:50%;margin-left:-56px;top:-2px}
+  .seat .mini-hand{height:calc(30px*1.42);margin:0 0 -8px;z-index:0}
+  .seat.pos-l .mini-hand{transform:rotate(8deg)}.seat.pos-r .mini-hand{transform:rotate(-8deg)}
+  .seat .mini-hand .card{margin-left:-20px}
+  .seat .mini-hand .card:first-child{margin-left:0}
+  .seat .av{--s:58px;border:4px solid #fff0c2;box-shadow:0 0 0 3px var(--wood-d),0 5px 8px rgba(0,0,0,.35);z-index:1}
+  .seat.active .av{box-shadow:0 0 0 4px #7df059,0 0 22px #7df059}
+  .plate{margin-top:-8px;z-index:2;min-width:84px;max-width:112px;padding:4px 10px;border-radius:14px;font-weight:900;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff3d4;text-align:center;
+    background:linear-gradient(180deg,#b86a2c,#8a4a1b);border:3px solid #5a2d0f;box-shadow:0 3px 0 #3a1c07}
+  .seat.active .plate{border-color:#ffd54a}
+  .sc{margin-top:-6px;z-index:3;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:16px;color:#fff;
+    background:linear-gradient(180deg,#ffb04a,#e8731a);border:3px solid #7a3a0c;box-shadow:0 3px 0 #3a1c07;-webkit-text-stroke:3px #8f3c05;paint-order:stroke fill}
+  .think{position:absolute;top:-4px;right:6px;z-index:5}
+  .me-row .av{--s:50px}
+  .me-row .nm{background:linear-gradient(180deg,#b86a2c,#8a4a1b);border:3px solid #5a2d0f;box-shadow:0 3px 0 #3a1c07;padding:2px 12px;border-radius:12px;display:inline-block;color:#fff3d4;text-shadow:none}
+  .me-row .sub{margin-top:4px}
+  .exit-btn{margin:0!important;font-size:15px!important;padding:8px 14px!important;border-radius:18px!important;flex:none;-webkit-text-stroke:4px #7a1710!important}
+  .plist{display:flex;flex-direction:column;border-radius:18px;overflow:hidden;border:4px solid #5a2d0f;margin:12px 0;box-shadow:0 5px 0 #3a1c07}
+  .plist .pl{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#a0581f;color:#fff3d4;font-weight:800;text-align:right}
+  .plist .pl:nth-child(odd){background:#8a4a1b}
+  .plist .pl.wait{opacity:.55;font-weight:600}
+  .plist .pl .av{--s:38px}
+  .plist .hdr{background:#6b3510;text-align:center;justify-content:center;font-size:16px}
+
   @media (max-height:700px){
     .sign-wrap{margin-top:36px}.logo{font-size:84px}.medal .disc{width:76px;height:76px;font-size:38px}.medals{margin-bottom:12px}.btn{font-size:20px;padding:12px 20px}
     .tray{height:42px}.hint{min-height:30px;padding:5px 14px;font-size:13px}.actions{padding-top:4px;min-height:60px}.actions .btn{padding:9px 8px}.felt{gap:4px}
@@ -360,8 +395,26 @@
   @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
-<body class="scene" data-theme="island" data-back="ruby">
+<body class="scene" data-theme="island" data-back="jungle">
 
+<div id="gscene" aria-hidden="true">
+<svg viewBox="0 0 390 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gsand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--sand1)"/><stop offset="1" style="stop-color:var(--sand2)"/></linearGradient>
+    <linearGradient id="gwat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--wat1)"/><stop offset="1" style="stop-color:var(--wat2)"/></linearGradient>
+  </defs>
+  <rect width="390" height="800" fill="url(#gsand)"/>
+  <path d="M0 0H390V70Q330 120 280 80Q200 130 130 85Q60 130 0 80Z" style="fill:var(--jung)"/>
+  <g fill="#000" opacity=".08"><ellipse cx="60" cy="230" rx="14" ry="8"/><ellipse cx="320" cy="260" rx="12" ry="7"/><ellipse cx="90" cy="400" rx="16" ry="8"/><ellipse cx="300" cy="420" rx="14" ry="8"/><ellipse cx="200" cy="150" rx="10" ry="6"/></g>
+  <path d="M0 520Q50 498 100 520T200 520T300 520T390 520V800H0Z" fill="url(#gwat)"/>
+  <path d="M0 520Q50 498 100 520T200 520T300 520T390 520" fill="none" stroke="#fff" stroke-width="7" opacity=".85"/>
+  <g stroke="#fff" fill="none" stroke-width="3" stroke-linecap="round" opacity=".7">
+    <path class="ripple" d="M60 620 q10 -7 20 0 t20 0"/><path class="ripple r2" d="M250 680 q10 -7 20 0 t20 0"/><path class="ripple r3" d="M150 750 q10 -7 20 0 t20 0"/>
+  </g>
+  <use class="sway" href="#palm" x="-70" y="-70" width="190" height="310"/>
+  <use class="sway s2" href="#palm" x="270" y="-80" width="190" height="310"/>
+  <use href="#bush" x="30" y="95"/><use href="#bush" x="365" y="100"/>
+</svg></div>
 <div id="scene" aria-hidden="true">
 <svg viewBox="0 0 390 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -504,6 +557,7 @@
     <div id="roomBox" class="card-box" style="display:none;text-align:center">
       <div class="hint-t" style="margin-bottom:10px">שתף את הקוד עם החברים:</div>
       <div class="room-code" id="roomCodeText">----</div>
+      <div class="plist" id="plist"></div>
       <div class="status" style="margin-top:14px"><span class="spinner"></span><span id="onlineStatus"></span></div>
       <div style="display:flex;gap:10px;margin-top:12px">
         <button class="btn sm" style="flex:1" onclick="shareRoom()">📤 שתף</button>
@@ -516,21 +570,19 @@
 <!-- ================= GAME ================= -->
 <section class="screen" id="game">
   <div class="g-top">
-    <button class="icon-btn" onclick="confirmQuit()" aria-label="יציאה">✕</button>
+    <button class="btn red exit-btn" onclick="confirmQuit()">יציאה</button>
     <button class="round-pill" onclick="showBoard()"><b id="roundLbl">סיבוב 1</b><span id="limitLbl">עד 200 נקודות</span></button>
     <button class="icon-btn" id="gameSnd" onclick="toggleSound()" aria-label="צליל">🔊</button>
     <button class="icon-btn" onclick="showRules()" aria-label="חוקים">?</button>
   </div>
-  <div class="seats" id="seats"></div>
   <div class="felt">
+    <div id="seats"></div>
     <div class="piles">
       <div class="pile-wrap">
-        <div class="discard empty" id="discard"></div>
-        <div class="pile-lbl">ערימה</div>
+        <div class="deck" id="deck" onclick="drawFromDeck()"><div class="card back" id="deckCard"></div><div class="cnt" id="deckCnt"></div></div>
       </div>
       <div class="pile-wrap">
-        <div class="deck" id="deck" onclick="drawFromDeck()"><div class="card back" id="deckCard"></div><div class="cnt" id="deckCnt"></div></div>
-        <div class="pile-lbl">חפיסה</div>
+        <div class="discard empty" id="discard"></div>
       </div>
     </div>
     <div class="tray off" id="tray"><span class="tl" id="trayLbl">השלכה</span><div class="tc" id="trayCards"></div></div>
@@ -567,10 +619,10 @@ const LS_KEY='yaniv.profile.v2';
 const AVATARS=['🦊','🐼','🐯','🦁','🐸','🐵','🦄','🐙','🐧','🦉','🐲','🚀'];
 const DEFAULTS={
   name:'', avatar:'🦊', lobbyCount:2, coins:300, xp:0, wheelAt:0,
-  owned:{ themes:['island'], backs:['ruby'] },
+  owned:{ themes:['island'], backs:['jungle'] },
   rules:{ startCards:7, yanivLimit:7, assafPenalty:15, loseScore:200, halveOnRound:true,
           sortByCombos:false, difficulty:'medium', playerCount:2 },
-  prefs:{ sound:true, haptic:true, theme:'island', back:'ruby' },
+  prefs:{ sound:true, haptic:true, theme:'island', back:'jungle' },
   stats:{ games:0, wins:0, rounds:0 }
 };
 function loadSettings(){
@@ -585,11 +637,12 @@ function loadSettings(){
 }
 const THEMES={island:{n:'אי טרופי',price:0,c:'linear-gradient(#58d3ea,#1b9ccf)'},meadow:{n:'שדה ירוק',price:300,c:'linear-gradient(#b5ec6d,#4fb53a)'},
   sunset:{n:'שקיעה',price:500,c:'linear-gradient(#ffc27a,#ff6f91)'},night:{n:'לילה',price:800,c:'linear-gradient(#4a52b8,#171a4d)'}};
-const BACKS={ruby:{n:'אדום',price:0,c:['#d6455a','#a52a40']},ocean:{n:'ים',price:150,c:['#3f8fe0','#1f5aa8']},
-  forest:{n:'יער',price:150,c:['#2fa66b','#17734a']},night:{n:'סגול',price:300,c:['#7a5bd6','#4a2f9e']}};
+const BACKS={jungle:{n:'ג׳ונגל',price:0,c:['#58c14a','#2f8f2e']},ruby:{n:'אדום',price:150,c:['#d6455a','#a52a40']},ocean:{n:'ים',price:150,c:['#3f8fe0','#1f5aa8']},
+  night:{n:'סגול',price:300,c:['#7a5bd6','#4a2f9e']}};
 const SETTINGS=loadSettings();
 if(!THEMES[SETTINGS.prefs.theme]) SETTINGS.prefs.theme='island';
-if(!BACKS[SETTINGS.prefs.back]) SETTINGS.prefs.back='ruby';
+if(!BACKS[SETTINGS.prefs.back]) SETTINGS.prefs.back='jungle';
+if(!SETTINGS.owned.backs.includes('jungle')) SETTINGS.owned.backs.push('jungle');
 const PREFS=SETTINGS.prefs;
 function saveSettings(flash){
   try{ localStorage.setItem(LS_KEY,JSON.stringify(SETTINGS)); }catch(e){}
@@ -927,7 +980,7 @@ function updateClockDisplay(){
 const pname=p=>String(p.name||'').replace(/🤖/g,'').trim()||'שחקן';
 const CPU_AV=['🤖','👾','🎃'];
 function avatarOf(p,i){ return p.avatar|| (MODE==='cpu' ? CPU_AV[(i-1+3)%3] : AVATARS[(i*5+1)%AVATARS.length]); }
-function myCw(){ const w=Math.min(window.innerWidth,520); return Math.max(46,Math.min(68,Math.round(w/6.2))); }
+function myCw(){ const w=Math.min(window.innerWidth,520); const n=G&&G.players?(G.players[G.meIndex].hand.length):7; const base=Math.max(46,Math.min(68,Math.round(w/6.2))); return n<=5?Math.min(80,Math.round((w-24)/5.2)):base; }
 function pileCw(){ return Math.min(myCw(),64); }
 
 function render(){
@@ -942,19 +995,18 @@ function render(){
 
   /* opponent seats */
   const seats=$('seats'); seats.innerHTML='';
-  G.players.forEach((p,i)=>{
-    if(i===G.meIndex) return;
+  const opps=G.players.map((p,i)=>i).filter(i=>i!==G.meIndex);
+  const posFor=k=>opps.length===1?'pos-t':opps.length===2?(k===0?'pos-l':'pos-r'):(['pos-l','pos-t','pos-r'][k]);
+  $('game').querySelector('.felt').style.setProperty('--ptop',(opps.length!==2?'96px':'0px'));
+  opps.forEach((i,k)=>{
+    const p=G.players[i];
     const active=G.turn===i&&!G.gameOver;
-    const s=document.createElement('div');
-    s.className='seat'+(active?' active':''); s.dataset.seat=i;
-    const pct=Math.min(100,p.score/RULES.loseScore*100);
-    s.innerHTML=`<div class="who"><span class="av" style="--s:30px">${esc(avatarOf(p,i))}</span><span class="nm">${esc(pname(p))}</span></div>
-      <div class="meta"><span>🏅 ${p.score}</span><span data-clock="${i}"></span>${active&&MODE==='cpu'?'<span class="think"><i></i><i></i><i></i></span>':''}</div>
-      <div class="mini-hand"></div>
-      <div class="meter"><i style="width:${pct}%;--bw:${pct>0?(100/pct*100):100}%"></i></div>`;
-    const mh=s.querySelector('.mini-hand');
-    p.hand.forEach(()=>mh.appendChild(cardEl(null,{cw:26,faceDown:true})));
-    seats.appendChild(s);
+    const sdiv=document.createElement('div');
+    sdiv.className='seat '+posFor(k)+(active?' active':''); sdiv.dataset.seat=i;
+    sdiv.innerHTML=`<div class="mini-hand"></div><span class="av">${esc(avatarOf(p,i))}</span><div class="plate">${esc(pname(p))}</div><div class="sc">${p.score}</div>${active&&MODE==='cpu'?'<span class="think"><i></i><i></i><i></i></span>':''}`;
+    const mh=sdiv.querySelector('.mini-hand');
+    p.hand.forEach(()=>mh.appendChild(cardEl(null,{cw:30,faceDown:true})));
+    seats.appendChild(sdiv);
   });
 
   /* deck + discard */
@@ -1289,7 +1341,7 @@ function cpuTurn(){
   sfxDiscard();
   best.forEach((c,i)=>{
     const el=qs(`#trayCards [data-id="${c.id}"]`);
-    if(el&&seatMini) flyGhost({card:c,from:{...seatMini,width:26,height:37},to:rectOf(el),delay:i*60,dur:460}).then(()=>unhide([c.id]));
+    if(el&&seatMini) flyGhost({card:c,from:{...seatMini,width:30,height:43},to:rectOf(el),delay:i*60,dur:460}).then(()=>unhide([c.id]));
     else unhide([c.id]);
   });
 
@@ -1313,7 +1365,7 @@ function cpuTurn(){
     const target=seatMini;
     startTurn();
     const to=rectOf(qs(`.seat[data-seat="${idx}"] .mini-hand`))||target;
-    if(fromRect&&to) flyGhost({card:drawn,faceDown,from:fromRect,to:{...to,width:26,height:37},dur:520});
+    if(fromRect&&to) flyGhost({card:drawn,faceDown,from:fromRect,to:{...to,width:30,height:43},dur:520});
   },950);
 }
 function shouldCallYaniv(diff,total){
@@ -1421,6 +1473,13 @@ function setOnlineWaiting(mode){ // 'home' | 'lobby' | 'room'
   $('lobbyBox').style.display=mode==='lobby'?'block':'none';
   $('roomBox').style.display=mode==='room'?'block':'none';
 }
+function renderPlist(){
+  if(!G||!$('plist')) return;
+  $('plist').innerHTML='<div class="pl hdr">שחקנים</div>'+G.players.map((p,i)=>{
+    const wait=p.name==='מחכה...';
+    return `<div class="pl ${wait?'wait':''}"><span class="av">${wait?'⏳':esc(i===G.meIndex?SETTINGS.avatar:avatarOf(p,i))}</span><span>${esc(wait?'ממתין לשחקן...':(i===G.meIndex?'אתה':pname(p)))}</span></div>`;
+  }).join('');
+}
 function shareRoom(){
   const text='בוא לשחק איתי יניב! קוד החדר: '+ROOM;
   if(navigator.share) navigator.share({text,url:location.href}).catch(()=>{});
@@ -1443,6 +1502,7 @@ async function createRoom(){
   setOnlineWaiting('room');
   $('roomCodeText').textContent=ROOM;
   $('onlineStatus').textContent='ממתין לחברים... (1/'+n+')';
+  renderPlist();
   subscribe();
   _hostPollTimer=setInterval(async()=>{
     if(!ROOM||!G||G.started){ clearInterval(_hostPollTimer); return; }
@@ -1451,6 +1511,7 @@ async function createRoom(){
     else if(data&&data.state){
       const joined=data.state.players.filter(p=>p.name!=='מחכה...').length;
       $('onlineStatus').textContent='ממתין לחברים... ('+joined+'/'+n+')';
+      G.players=data.state.players; renderPlist();
     }
   },2000);
 }
@@ -1482,6 +1543,7 @@ async function joinRoom(){
     setOnlineWaiting('room');
     $('roomCodeText').textContent=ROOM;
     $('onlineStatus').textContent='הצטרפת! ממתין לשאר השחקנים...';
+    renderPlist();
     startGamePoll();
   }
 }
@@ -1539,6 +1601,7 @@ function applyRemote(remote){
   } else {
     const joined=G.players.filter(p=>p.name!=='מחכה...').length;
     $('onlineStatus').textContent='ממתין לשחקנים... ('+joined+'/'+G.players.length+')';
+    renderPlist();
   }
 }
 function leaveAndMenu(){
