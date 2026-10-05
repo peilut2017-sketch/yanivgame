@@ -1,4 +1,4 @@
-const CACHE='yaniv-v4';
+const CACHE='yaniv-v5';
 const ASSETS=['./','index.html','manifest.json','icon-192.png','icon-180.png','icon-512.png'];
 
 self.addEventListener('install',e=>{
