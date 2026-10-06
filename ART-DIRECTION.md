@@ -26,7 +26,7 @@ The user subsequently requested direct select-and-draw turns, appropriate sounds
 - Slapdown was explained as a rule variant, but is not enabled without a choice from the user.
 
 ## Validation
-Final verification: 16 pure transition tests, 44 browser checks across the four requested mobile sizes, six isolated online integration checks, offline reload/dealing, JavaScript parsing and git diff --check.
+The timed-turn milestone was verified with 16 transition tests, 44 browser checks and six isolated online checks. The subsequent selection/round-flow/CPU refinement passed 25 logic tests, 56 browser checks, eight isolated online checks, 624 simulated rounds and offline loading. See CPU-STRATEGY.md for the current behavior and benchmark limits.
 The online checks use the real Supabase SDK with intercepted HTTP responses: competing timeout observers, double-click prevention, deadline/action conflict, network failure rollback, inactive-host forfeiture, and no browser errors. They do not create production database records.
 Actual Chrome screenshots cover home, settings, online selection, waiting room, normal/selected hands, ready-to-call Yaniv, announcements, results, timer warning and forfeiture.
 The initial presentation-only milestone also compared 35 core functions to the starting commit. That comparison is historical: the later user-requested timed-turn workflow intentionally changes turn orchestration and online write coordination.

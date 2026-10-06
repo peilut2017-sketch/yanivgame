@@ -1,5 +1,5 @@
-const CACHE='yaniv-v7-timed-turns';
-const ASSETS=['./','index.html','styles.css','turn-engine.js','turn-controller.js','assets/mediterranean-terrace.webp','assets/club-portraits.webp','manifest.json','icon-192.png','icon-180.png','icon-512.png'];
+const CACHE='yaniv-v8-rounds-strategy';
+const ASSETS=['./','index.html','styles.css','card-rules.js','cpu-strategy.js','turn-engine.js','turn-controller.js','assets/mediterranean-terrace.webp','assets/club-portraits.webp','manifest.json','icon-192.png','icon-180.png','icon-512.png'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(

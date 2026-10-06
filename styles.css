@@ -573,4 +573,14 @@ body::before{display:none}
 .turn-instruction{direction:rtl;display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;text-align:right;text-shadow:0 1px 3px #113749}
 .turn-instruction b{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.turn-instruction span{font-size:11px;color:#d2e2d3}
 .station.forfeited .av,.station.forfeited .fan-mini{filter:grayscale(1);opacity:.5}.station.forfeited .cc{display:none}.forfeit-label{font-size:10px;color:#ffd7be;margin-top:3px;text-shadow:0 1px #143849}
+.stn-name{display:flex;align-items:center;gap:4px;padding-inline:5px;max-width:112px}
+.player-name-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.player-level{display:inline-flex;align-items:center;gap:2px;flex:none;font:800 11px var(--f-body);color:#fff0bd;white-space:nowrap}
+.player-level small{font-size:8px;font-weight:500;opacity:.85}
+.station.active .player-level,.re-row .player-level{color:#806022}
+.bot-label{position:relative;z-index:1;font-size:9px;color:#e3ecdf;text-shadow:0 1px 2px #123a42;margin-top:3px}
+.station:has(.bot-label) .fan-mini{top:120px}
+@media(max-height:740px){.station:has(.bot-label) .fan-mini{top:106px}}
+.round-countdown{text-align:center;margin-top:16px;padding:12px;border-radius:10px;background:#e4ede4;color:#245b66;font-weight:700}
+.round-countdown b{display:inline-block;min-width:1.2em;font-size:21px}
 @media(max-height:740px){.turn-clock{height:52px;width:48px}.turn-status{gap:10px}.turn-instruction b{font-size:14px}}

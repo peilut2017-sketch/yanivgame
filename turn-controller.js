@@ -1,6 +1,6 @@
 /* UI orchestration. Online turns use compare-and-swap against updated_at. */
 let _moveBusy=false,_timeoutBusy=false,_timeoutRetryAt=0,_cpuScheduled='',_tickCue='',_lastEventSeen='',_forfeitShown='',_forfeitLossRecorded=false;
-const turnHelpers=()=>({isValidSet,shuffle,handTotal});
+const turnHelpers=()=>({isValidSet,shuffle,handTotal,orderSet:CardRules.ordered});
 const gameNow=()=>Date.now();
 function liveTurn(){return G&&!G.gameOver&&!G.players[G.meIndex].forfeited&&G.turn===G.meIndex;}
 function startTurn(){
@@ -65,11 +65,12 @@ function presentGameTransition(old){
   const ev=G.lastEvent,key=ev?G.round+':'+ev.sequence+':'+ev.kind:'';
   if(ev&&key!==_lastEventSeen){
     _lastEventSeen=key;
-    if(ev.kind==='timeout'||ev.kind==='forfeit'){
-      sfxTimeout();toast(ev.kind==='forfeit'?pname(G.players[ev.actor])+' הפסיד בגלל חוסר פעילות':'תם הזמן · בוצע מהלך אוטומטי ('+ev.idleTurns+'/3)',2800);
+    if(ev.kind==='forfeit'){
+      toast(pname(G.players[ev.actor])+' הפסיד בגלל חוסר פעילות',2800);
     }else if(ev.kind==='move'){sfxDiscard();setTimeout(sfxDraw,130);}
   }
-  if(G.gameOver){stopClock();render();if(G.forfeitResult)showForfeitResult();else if(G.roundResult&&!_announcing&&!$('overlay').classList.contains('show'))announceThenResult();return;}
+  if(G.gameOver){stopClock();render();scheduleRoundAdvance();if(G.forfeitResult)showForfeitResult();else if(G.roundResult&&!_announcing&&!$('overlay').classList.contains('show'))announceThenResult();return;}
+  cancelRoundAdvance();
   if(!clockTimer)startClock();
   if(old&&old.round!==G.round){closeOverlay();resetClocks();}
   if(!old||old.turnSequence!==G.turnSequence||old.turn!==G.turn)startTurn();else render();
@@ -117,4 +118,35 @@ function showForfeitResult(){
   const winner=G.forfeitResult.winnerIdx;
   if(winner!==null&&!_forfeitLossRecorded)recordStats(true,winner,winner);
   overlay('<h2>'+(winner===G.meIndex?'ניצחת!':'המשחק הסתיים')+'</h2><p>'+esc(winner===null?'אין שחקנים פעילים':pname(G.players[winner])+' נשאר במשחק וניצח')+'</p><p>שחקן שלא מבצע מהלך בשלושה תורים רצופים מפסיד.</p><div class="btns"><button class="btn" onclick="fullRestart()">'+(MODE==='cpu'?'משחק חדש':'לתפריט')+'</button></div>',{closable:false,kind:'result'});
+}
+
+let _roundAutoTimer=null,_roundAutoKey='',_roundRetryAt=0;
+function cancelRoundAdvance(){clearInterval(_roundAutoTimer);_roundAutoTimer=null;_roundAutoKey='';}
+function scheduleRoundAdvance(){
+  if(!G?.gameOver||!G.roundResult||TurnEngine.matchOver(G)){cancelRoundAdvance();return;}
+  const key=(G.gameId||ROOM||'cpu')+':'+G.round+':'+G.turnSequence;
+  if(_roundAutoKey===key)return;
+  cancelRoundAdvance();_roundAutoKey=key;_roundRetryAt=0;
+  // Legacy rooms without a persisted deadline still progress after six seconds.
+  const deadline=G.nextRoundAt||gameNow()+6000;
+  const tick=()=>{
+    if(!G||!G.gameOver||key!==(G.gameId||ROOM||'cpu')+':'+G.round+':'+G.turnSequence||!$('game').classList.contains('active')){cancelRoundAdvance();return;}
+    const seconds=Math.max(0,Math.ceil((deadline-gameNow())/1000));
+    document.querySelectorAll('[data-round-seconds]').forEach(el=>el.textContent=seconds);
+    if(!seconds&&!_moveBusy&&gameNow()>=_roundRetryAt){_roundRetryAt=gameNow()+1500;nextRound();}
+  };
+  _roundAutoTimer=setInterval(tick,200);tick();
+}
+
+async function syncMyProfile(){
+  const room=ROOM,me=G?.meIndex,profile=_sessionProfile;if(!room||!profile||MODE!=='online')return;
+  for(let attempt=0;attempt<3;attempt++){
+    const fresh=await sb.from('yaniv_games').select('state,updated_at').eq('code',room).single();
+    if(fresh.error||!fresh.data||ROOM!==room||!G)return;
+    const next=clone(fresh.data.state);if(!next.players[me])return;Object.assign(next.players[me],profile);
+    const revision=new Date(Math.max(gameNow(),Date.parse(fresh.data.updated_at)+1)).toISOString();
+    const write=await sb.from('yaniv_games').update({state:next,updated_at:revision}).eq('code',room).eq('updated_at',fresh.data.updated_at).select('state,updated_at');
+    if(write.error)return;
+    if(write.data?.length){_lastSeenUpdatedAt=revision;G=write.data[0].state;G.meIndex=me;G.iAmHost=(G.hostIndex||0)===me;return;}
+  }
 }

@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "node scripts/serve.cjs",
     "verify": "node scripts/verify.cjs",
-    "test": "node --test scripts/turn-engine.test.cjs",
-    "test:online": "node scripts/online-turns.cjs"
+    "test": "node --test scripts/turn-engine.test.cjs scripts/strategy.test.cjs",
+    "test:online": "node scripts/online-turns.cjs",
+    "test:cpu": "node scripts/benchmark-cpu.cjs"
   },
   "devDependencies": {
     "playwright": "1.63.0"

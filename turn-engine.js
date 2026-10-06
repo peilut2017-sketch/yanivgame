@@ -3,6 +3,11 @@
   'use strict';
   const TURN_MS=15000,MAX_IDLE=3,copy=s=>JSON.parse(JSON.stringify(s));
   const active=s=>s.players.map((p,i)=>p.forfeited?-1:i).filter(i=>i>=0);
+  const matchOver=s=>!!s.forfeitResult||s.players.some(p=>!p.forfeited&&p.score>=(s.rules?.loseScore||200));
+  function starter(s,rng=Math.random){
+    const living=active(s),r=s.roundResult,winner=r?(r.assaf?r.assafBy:r.callerIdx):null;
+    return living.includes(winner)?winner:living[Math.min(living.length-1,Math.floor(rng()*living.length))];
+  }
   function arm(s,now=Date.now()){s.turnSequence=(s.turnSequence||0)+1;s.turnDeadline=now+TURN_MS;return s;}
   function appendUnique(target,cards){const ids=new Set(target.map(c=>c.id));for(const c of cards){if(c&&!ids.has(c.id)){target.push(c);ids.add(c.id);}}}
   function recycle(s,shuffle){
@@ -39,7 +44,7 @@
     }else throw Error('בחרו מאיפה למשוך');
     if(!legacy)p.hand=p.hand.filter(c=>!ids.includes(c.id));
     appendUnique(s.discard,available.filter(c=>source!=='pile'||c.id!==drawn.id));
-    s.availableToTake=thrown.slice();s.pendingDiscard=null;s.justDiscarded=thrown.slice();s.lastDrawnId=drawn.id;p.hand.push(drawn);
+    s.availableToTake=helpers.orderSet?helpers.orderSet(thrown):thrown.slice();s.pendingDiscard=null;s.justDiscarded=thrown.slice();s.lastDrawnId=drawn.id;p.hand.push(drawn);
     p.idleTurns=timeout?(p.idleTurns||0)+1:0;
     const forfeited=p.idleTurns>=MAX_IDLE;
     if(forfeited){p.forfeited=true;p.forfeitReason='timeout';appendUnique(s.discard,p.hand);p.hand=[];}
@@ -61,7 +66,8 @@
     if(rules.halveOnRound){const mark=rules.loseScore/2;s.players.forEach((p,i)=>{if(!p.forfeited&&p.score>0&&p.score%mark===0&&p.score<rules.loseScore){p.score/=2;halved.push(i);}});}
     s.players[actor].idleTurns=0;s.gameOver=true;s.turnDeadline=0;s.turnSequence=(s.turnSequence||0)+1;
     s.roundResult={callerIdx:actor,callerTotal,assaf:!!assafers.length,assafers,assafBy,totals,before,after:s.players.map(p=>p.score),halved};
+    s.nextRoundAt=matchOver({...s,rules})?0:now+6000;
     s.lastEvent={kind:'yaniv',actor,sequence:s.turnSequence};return s;
   }
-  return {TURN_MS,MAX_IDLE,active,arm,play,yaniv};
+  return {TURN_MS,MAX_IDLE,active,matchOver,starter,arm,play,yaniv};
 });

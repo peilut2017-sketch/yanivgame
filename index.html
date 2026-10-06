@@ -17,6 +17,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=Secular+One&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="styles.css">
+<script src="card-rules.js"></script>
+<script src="cpu-strategy.js"></script>
 <script src="turn-engine.js"></script>
 </head>
 <body class="on-home" data-screen="menu" data-theme="marina">
@@ -208,7 +210,7 @@ const AV_BG=['#9DE6DC','#F7C9A0','#BCD6F0','#F4B3A3','#CFE6A9','#E5C8EE','#FFE08
 const AV_SKIN=['#F2C9A0','#D49B6A','#9C633D','#F6D9BD','#7E4A2C','#E8B48A'];
 const AV_HAIR=['#2F2420','#6B3F23','#C98A3C','#1B1B22','#B5452F','#D8D2C2'];
 const AV_SHIRT=['#D86F45','#245B78','#30B9B0','#E6B84B','#EF765C','#287FA3'];
-const AV_COUNT=12, CPU_AV=[3,7,10];
+const AV_COUNT=12;
 function avatarSvg(n){
   n=((n%AV_COUNT)+AV_COUNT)%AV_COUNT;
   const bg=AV_BG[n], sk=AV_SKIN[(n*5+1)%6], hr=AV_HAIR[(n*7+2)%6], sh=AV_SHIRT[(n*3+1)%6], st=n%6;
@@ -276,6 +278,18 @@ function saveSettings(flash){
   if(flash){ const f=$('savedFlag'); f.classList.add('show'); clearTimeout(f._t); f._t=setTimeout(()=>f.classList.remove('show'),1100); }
 }
 const myName=()=>SETTINGS.name.trim()||'שחקן';
+const PLAYER_NAMES=['נועה','איתי','מאיה','אדם','ליה','עומר','תמר','יובל','אמיר','יעל','נור','סאמר','דניאל','לינה','אלה','רוני','אלכס','סופיה','ליאם','יסמין','מיכאל','נטע','אור','שחר','רפאל','כרמל','דנה','אריאל','ליאל','מיקה','אילן','רום'];
+let _sessionProfile=null;
+function humanProfile(){return {name:SETTINGS.name.trim()||PLAYER_NAMES[Math.floor(Math.random()*PLAYER_NAMES.length)],avatar:SETTINGS.name.trim()?SETTINGS.avatar:Math.floor(Math.random()*AV_COUNT),level:levelInfo(SETTINGS.xp).L,bot:false};}
+function botProfiles(count,exclude){
+  const names=shuffle(PLAYER_NAMES.filter(n=>n!==exclude.name)),avatars=shuffle(Array.from({length:AV_COUNT},(_,i)=>i).filter(i=>i!==exclude.avatar));
+  const bounds={easy:[1,5],medium:[6,14],hard:[15,30]}[RULES.difficulty]||[6,14];
+  return Array.from({length:count},(_,i)=>({name:names[i],avatar:avatars[i],level:bounds[0]+Math.floor(Math.random()*(bounds[1]-bounds[0]+1)),bot:true,hand:[],score:0}));
+}
+function playerLevel(p){return Math.max(1,Math.floor(Number(p.level)||1));}
+function levelBadge(p){return '<span class="player-level" aria-label="רמה '+playerLevel(p)+'">'+playerLevel(p)+'<small>רמה</small></span>';}
+function playerNameHtml(p){return '<span class="player-name-text">'+esc(pname(p))+'</span>'+levelBadge(p);}
+function botLabel(p){return p.bot?'מחשב · '+({easy:'קל',medium:'בינוני',hard:'קשה'}[RULES.difficulty]||'בינוני'):'';}
 let RULES=clone(SETTINGS.rules);
 function applyRulesFrom(state){ if(state&&state.rules) RULES={...RULES,...state.rules}; }
 
@@ -356,21 +370,7 @@ function flyTo(card,faceDown,from,selector,opts={}){
 /* =====================================================================
    RULES: valid discard sets
    ===================================================================== */
-function isValidSet(cards){
-  if(cards.length===0) return false; if(cards.length===1) return true;
-  const jokers=cards.filter(c=>c.r==='JOKER'), real=cards.filter(c=>c.r!=='JOKER');
-  if(real.length>0&&real.every(c=>c.r===real[0].r)) return true;
-  if(real.length>=2){
-    const suit=real[0].s;
-    if(real.every(c=>c.s===suit)){
-      const idx=real.map(c=>RANKS.indexOf(c.r)).sort((a,b)=>a-b);
-      if(new Set(idx).size!==idx.length) return false;
-      let gaps=0; for(let i=1;i<idx.length;i++) gaps+=(idx[i]-idx[i-1]-1);
-      if(gaps<=jokers.length&&cards.length>=3) return true;
-    }
-  }
-  return false;
-}
+function isValidSet(cards){return CardRules.valid(cards);}
 
 /* =====================================================================
    GAME STATE
@@ -378,13 +378,15 @@ function isValidSet(cards){
 let G=null, MODE=null, selected=new Set();
 function newRound(state){
   const deck=shuffle(buildDeck());state._animateDeal=true;
+  state.turn=TurnEngine.starter(state);
+  state.nextRoundAt=0;state.lastEvent=null;
   state.players.forEach(p=>{p.hand=p.forfeited?[]:deck.splice(0,RULES.startCards);});
   state.discard=[];state.availableToTake=[deck.shift()];state.deck=deck;
   state.pendingDiscard=null;state.phase='action';state.justDiscarded=null;state.lastDrawnId=null;state.roundResult=null;state.forfeitResult=null;
   state.hostIndex=state.hostIndex||0;
   if(state.players[state.turn]?.forfeited)state.turn=TurnEngine.active(state)[0];
   TurnEngine.arm(state,Date.now());
-  if(state.round===1){_forfeitLossRecorded=false;_forfeitShown='';_lastEventSeen='';_cpuScheduled='';}
+  if(state.round===1){_tickCue='';_forfeitLossRecorded=false;_forfeitShown='';_lastEventSeen='';_cpuScheduled='';}
 }
 
 /* =====================================================================
@@ -548,20 +550,20 @@ function showRules(){
    <div class="rsec"><h4><span class="n">2</span>התור שלך</h4><p><b>קודם משליכים</b> קלף בודד, או קבוצה שאפשר להשליך יחד:</p>
      <p style="margin-bottom:2px">סט – אותו ערך</p><div class="ex" data-c="7♠ 7♥ 7♦"></div>
      <p style="margin:6px 0 2px">רצף – אותו סימן, לפחות 3 ברצף</p><div class="ex" data-c="4♥ 5♥ 6♥"></div></div>
-   <div class="rsec"><h4><span class="n">3</span>משיכה</h4><p>בחרו קלפים ביד, ואז לחצו על החפיסה או על קלף זמין בערימה. ההשלכה והמשיכה מתבצעות יחד. <b>מושכים</b> קלף: מהחפיסה, או מקצה הקבוצה שהשחקן הקודם השליך.</p></div>
+   <div class="rsec"><h4><span class="n">3</span>משיכה</h4><p>בחרו קלפים ביד, ואז לחצו על החפיסה או על קלף זמין בערימה. ההשלכה והמשיכה מתבצעות יחד. הבחירה מאפשרת רק צירוף חוקי; בחירת שני קלפים לרצף משלימה אוטומטית קלפים מתאימים מהיד, אם יש. <b>מושכים</b> קלף: מהחפיסה, או מקצה הקבוצה שהשחקן הקודם השליך.</p></div>
    <div class="rsec"><h4><span class="n">4</span>יניב!</h4><p>כשערך היד שלך הוא <b>${r.yanivLimit} או פחות</b>, אפשר לקרוא "יניב" בתחילת התור וסוף הסיבוב.</p>
      <div class="ex" data-c="A♠ 2♥ 4♦"></div><div class="callout"><b>1 + 2 + 4 = 7</b> — אפשר לקרוא יניב.</div></div>
    <div class="rsec"><h4><span class="n">5</span>אסף!</h4><p>אם לשחקן אחר יש ערך <b>שווה או נמוך</b>, הוא תפס אותך: אתה מקבל קנס של <b>${r.assafPenalty}</b> נקודות ועוד ערך היד שלו. אחרת, כל השאר מקבלים את ערך ידם.</p></div>
    <div class="rsec"><h4><span class="n">6</span>ניצחון</h4><p>מי שמגיע ל-<b>${r.loseScore}</b> נקודות מפסיד. מנצח מי שנשאר עם הכי מעט.</p></div>
-   <div class="rsec"><h4><span class="n">7</span>זמן לתור</h4><p>לכל תור 15 שניות. אם הזמן נגמר, קלף אקראי מושלך ונמשך קלף מהחפיסה. אחרי 3 תורים רצופים ללא מהלך נרשם הפסד אוטומטי. מהלך בזמן מאפס את הרצף.</p></div><div class="btns"><button class="btn" onclick="closeOverlay()">הבנתי</button></div>`);
+   <div class="rsec"><h4><span class="n">7</span>זמן ותור פתיחה</h4><p>לכל תור 15 שניות, עם תיקתוק בחמש האחרונות כשהצליל פעיל. אם הזמן נגמר, מתבצע מהלך אקראי ללא הודעה. אחרי 3 תורים רצופים ללא מהלך נרשם הפסד אוטומטי. מהלך בזמן מאפס את הרצף. הסבב הבא מתחיל אוטומטית כ־6 שניות אחרי ההכרזה. הראשון במשחק נבחר באקראי; לאחר מכן מנצח הסבב פותח, גם באסף.</p></div><div class="btns"><button class="btn" onclick="closeOverlay()">הבנתי</button></div>`);
   document.querySelectorAll('#panel .ex[data-c]').forEach(ex=>{ ex.dataset.c.split(' ').forEach(t=>ex.appendChild(cardEl(parseCard(t),{cw:46}))); });
 }
 function showBoard(){
   if(!G) return;
   const rows=G.players.map((p,i)=>{
     const pct=Math.min(100,p.score/RULES.loseScore*100);
-    return `<div class="board-row">${avHtml(i===G.meIndex?SETTINGS.avatar:avatarOf(p,i),44)}
-      <div class="grow">${esc(i===G.meIndex?'אתה':pname(p))}<div class="meter"><i style="width:${pct}%;--bw:${pct>0?(100/pct*100):100}%"></i></div></div><b class="sc">${p.score}</b></div>`;
+    return `<div class="board-row">${avHtml(avatarOf(p,i),44)}
+      <div class="grow">${playerNameHtml(p)}<div class="meter"><i style="width:${pct}%;--bw:${pct>0?(100/pct*100):100}%"></i></div></div><b class="sc">${p.score}</b></div>`;
   }).join('');
   overlay(`<h2>לוח תוצאות</h2><p>סיבוב ${G.round||1} · מפסיד מי שמגיע ל-${RULES.loseScore}</p>${rows}`);
 }
@@ -597,7 +599,7 @@ function confirmQuit(){
    SETTINGS SCREEN
    ===================================================================== */
 const RULE_UI=[
-  {k:'difficulty',t:'רמת קושי של המחשב',d:'קשה: המחשב מחכה לפעמים עם הקריאה ולוקח קלפים שמשלימים לו צירוף',o:[['easy','קל'],['medium','בינוני'],['hard','קשה']]},
+  {k:'difficulty',t:'רמת קושי של המחשב',d:'קל: מהלכים אקראיים. בינוני: מוריד ניקוד מיד. קשה: משווה משיכות, צירופים וסיכון לאסף. רמת הניסיון המוצגת נפרדת מהקושי.',o:[['easy','קל'],['medium','בינוני'],['hard','קשה']]},
   {k:'playerCount',t:'מספר שחקנים',d:'כולל אותך — מול המחשב או בחדר אונליין',o:[[2,'2'],[3,'3'],[4,'4']]},
   {k:'startCards',t:'קלפים בפתיחה',d:'כמה קלפים מקבל כל שחקן בתחילת סיבוב',o:[[5,'5 קלפים'],[7,'7 קלפים']]},
   {k:'yanivLimit',t:'סף קריאת "יניב"',d:'הערך המרבי של היד כדי לקרוא יניב',o:[[5,'עד 5'],[7,'עד 7']]},
@@ -637,7 +639,7 @@ const pname=p=>String(p.name||'').replace(/🤖/g,'').trim()||'שחקן';
 function avatarOf(p,i){
   if(typeof p.avatar==='number') return p.avatar;
   if(typeof p.avatar==='string'){ const k=LEGACY_AV.indexOf(p.avatar); if(k>=0) return k; }
-  return MODE==='cpu' ? CPU_AV[(i-1+3)%3] : (i*5+1)%AV_COUNT;
+  return hash(pname(p)+':'+i)%AV_COUNT;
 }
 function myCw(){
   const w=Math.min(window.innerWidth,520), n=G&&G.players?G.players[G.meIndex].hand.length:7;
@@ -659,8 +661,8 @@ function render(){
   $('arena').dataset.players=G.players.length;
   opps.forEach((i,k)=>{
     const p=G.players[i], active=G.turn===i&&!G.gameOver;
-    const st=document.createElement('div'); st.className='station '+posFor(k)+(active?' active':'')+(p.forfeited?' forfeited':''); st.dataset.seat=i; st.setAttribute('aria-label',`${pname(p)}, ${p.score} נקודות, ${p.hand.length} קלפים${active?', בתור':''}`);
-    st.innerHTML=`<div class="fan-mini"></div><div class="stn-av"><span class="ring"></span>${avHtml(avatarOf(p,i),62)}<span class="sc">${p.score}</span><span class="cc">${p.hand.length}</span></div><div class="stn-name">${esc(pname(p))}</div>${p.forfeited?'<span class="forfeit-label">הפסד · לא פעיל</span>':''}${active&&MODE==='cpu'?'<span class="think"><i></i><i></i><i></i></span>':''}`;
+    const st=document.createElement('div'); st.className='station '+posFor(k)+(active?' active':'')+(p.forfeited?' forfeited':''); st.dataset.seat=i; st.setAttribute('aria-label',`${pname(p)}, רמה ${playerLevel(p)}${p.bot?", "+botLabel(p):""}, ${p.score} נקודות, ${p.hand.length} קלפים${active?', בתור':''}`);
+    st.innerHTML=`<div class="fan-mini"></div><div class="stn-av"><span class="ring"></span>${avHtml(avatarOf(p,i),62)}<span class="sc">${p.score}</span><span class="cc">${p.hand.length}</span></div><div class="stn-name">${playerNameHtml(p)}</div>${p.bot?`<span class="bot-label">${botLabel(p)}</span>`:""}${p.forfeited?'<span class="forfeit-label">הפסד · לא פעיל</span>':''}${active&&MODE==='cpu'?'<span class="think"><i></i><i></i><i></i></span>':''}`;
     const mh=st.querySelector('.fan-mini'); p.hand.forEach((c,j)=>{const back=cardEl(null,{cw:28,faceDown:true});back.style.setProperty('--i',j);mh.appendChild(back)});
     seats.appendChild(st);
   });
@@ -694,7 +696,7 @@ function render(){
   if(thrown.length){ $('trayLbl').textContent=G.turn===G.meIndex?'ההשלכה שלך':'ההשלכה של '+pname(G.players[G.turn]); thrown.forEach(c=>tc.appendChild(cardEl(c,{cw:28}))); }
 
   /* local player */
-  $('meName').textContent=me.name||myName(); $('meAv').innerHTML=avHtml(SETTINGS.avatar,52);
+  $('meName').innerHTML=playerNameHtml(me); $('meAv').innerHTML=avHtml(avatarOf(me,G.meIndex),52);
   $('meScore').textContent='ניקוד '+me.score;
   $('meArea').classList.toggle('active',myTurn);
   const tot=handTotal(me.hand), hv=$('handValBox');
@@ -733,7 +735,7 @@ function renderHintAndActions(myTurn){
   else if(me.forfeited)txt='יצאת מהמשחק · אפשר להמשיך לצפות';
   else if(_moveBusy)txt='שולחים את המהלך…';
   else if(!myTurn)txt='התור של '+pname(G.players[G.turn]);
-  else{mine=true;txt=selected.size===0?'בחרו קלפים, ואז חפיסה או ערימה':isValidSet(selectedCards())?'עכשיו בחרו מהחפיסה או מקצה הערימה':'הצירוף לא חוקי';}
+  else{mine=true;txt=selected.size===0?'בחרו קלפים, ואז חפיסה או ערימה':isValidSet(selectedCards())?'עכשיו בחרו מהחפיסה או מקצה הערימה':'בחרו צירוף להשלכה';}
   hint.textContent=txt;hint.className='hint'+(mine?' mine':'');
   const t=document.createElement('button');t.className='token';const ready=myTurn&&!me.forfeited&&!_moveBusy&&!G.gameOver&&G.phase==='action'&&handTotal(me.hand)<=RULES.yanivLimit;
   t.innerHTML='<span>יניב!</span><small>'+(ready?'זה הרגע':RULES.yanivLimit+' ומטה')+'</small>';t.disabled=!ready;t.onclick=callYaniv;t.setAttribute('aria-label','קריאת יניב, סף '+RULES.yanivLimit);wrap.appendChild(t);
@@ -743,7 +745,9 @@ function renderHintAndActions(myTurn){
 function selectedCards(){ return G.players[G.meIndex].hand.filter(c=>selected.has(c.id)); }
 function toggleSelect(id){
   if(_moveBusy||G.turn!==G.meIndex||G.phase!=='action'||G.gameOver||G.players[G.meIndex].forfeited) return;
-  if(selected.has(id)){ selected.delete(id); sfxDeselect(); } else { selected.add(id); sfxSelect(); }
+  const before=[...selected],next=CardRules.toggle(G.players[G.meIndex].hand,before,id);
+  if(next.length===before.length&&next.every(x=>selected.has(x)))return;
+  selected=new Set(next);if(before.includes(id))sfxDeselect();else sfxSelect();
   document.querySelectorAll('#youHand .card').forEach(e=>{const on=selected.has(e.dataset.id);e.classList.toggle('selected',on);e.setAttribute('aria-pressed',String(on));});
   renderHintAndActions(true);
 }
@@ -823,16 +827,15 @@ function showRoundEnd(){
   const rows=order.map((i,place)=>{
     const p=G.players[i], delta=rr.after[i]-rr.before[i];
     const tags=(p.forfeited?'<span class="tag bad">הפסד אוטומטי</span>':'')+(i===rr.callerIdx?`<span class="tag ${rr.assaf?'bad':''}">${rr.assaf?'נתפס':'קרא יניב'}</span>`:'')+(rr.halved.includes(i)?'<span class="tag">הניקוד נחצה</span>':'');
-    return `<div class="re-row ${i===roundWinner?'win':''}" style="animation-delay:${place*.09}s"><span class="place">${place+1}</span>${avHtml(i===G.meIndex?SETTINGS.avatar:avatarOf(p,i),42)}
-      <div class="mid"><div class="nm">${esc(i===G.meIndex?'אתה':pname(p))} ${tags}</div><div class="re-cards" data-hand="${i}"></div></div>
+    return `<div class="re-row ${i===roundWinner?'win':''}" style="animation-delay:${place*.09}s"><span class="place">${place+1}</span>${avHtml(avatarOf(p,i),42)}
+      <div class="mid"><div class="nm">${playerNameHtml(p)} ${tags}</div><div class="re-cards" data-hand="${i}"></div></div>
       <div class="re-score"><b data-count="${rr.after[i]}" data-from="${rr.before[i]}">${rr.before[i]}</b><small class="${delta>0?'plus':'zero'}"><bdi dir="ltr">${delta>0?'+'+delta:'+0'}</bdi> · יד ${rr.totals[i]}</small></div></div>`;
   }).join('');
   let tail;
   if(someoneLost){
     tail=`<div class="gold-line"></div><div style="font-family:var(--f-disp);font-size:22px;color:var(--terra-d)">${esc(winnerIdx===G.meIndex?'ניצחת במשחק!':pname(G.players[winnerIdx])+' ניצח במשחק!')}</div>
       <div class="btns"><button class="btn" onclick="fullRestart()">${MODE==='cpu'?'משחק חדש':'חזרה לתפריט'}</button>${MODE==='cpu'?'<button class="btn ivory" onclick="closeOverlay();quitGame()">לתפריט הראשי</button>':''}</div>`;
-  } else if(MODE==='online'&&!G.iAmHost){ tail=`<div class="status" style="margin-top:12px"><span class="dots"><i></i><i></i><i></i></span>ממתינים למארח</div>`; }
-  else tail=`<div class="btns"><button class="btn" onclick="nextRound()">הסיבוב הבא</button></div>`;
+  } else tail=`<div class="round-countdown" role="status">הסיבוב הבא בעוד <b data-round-seconds>6</b> שניות</div>`;
   const rw=reward?`<div class="reward"><span><b class="coin"></b>+${reward.coins}</span><span><b class="xpb">XP</b>+${reward.xp}</span></div>${reward.lvl?`<div class="lvlup">עלית לרמה ${reward.lvl}</div>`:''}`:'';
   overlay(`${head}<div class="re-list">${rows}</div>${rw}${tail}`,{closable:false,cap:rr.assaf?'bad':'terra',kind:'result'});
   G.players.forEach((p,i)=>{ const box=qs(`.re-cards[data-hand="${i}"]`); if(!box) return;
@@ -842,11 +845,15 @@ function showRoundEnd(){
     (function step(t){ const k=Math.max(0,Math.min(1,(t-t0)/900)); b.textContent=Math.round(from+(to-from)*(1-Math.pow(1-k,3))); if(k<1) requestAnimationFrame(step); })(performance.now());
   });
   if(roundWinner===G.meIndex||(someoneLost&&winnerIdx===G.meIndex)) confetti(someoneLost?70:34);
+  scheduleRoundAdvance();
 }
 async function nextRound(){
-  if(!G||_moveBusy||!G.gameOver||(MODE==='online'&&!G.iAmHost))return;_moveBusy=true;
-  try{await commitTransition(base=>{const s=clone(base);s.gameOver=false;s.roundResult=null;s.round=(s.round||1)+1;s.turn=MODE==='cpu'&&!s.players[G.meIndex].forfeited?G.meIndex:TurnEngine.active(s)[0];newRound(s);return s;});}
-  finally{_moveBusy=false;}
+  if(!G||_moveBusy||!G.gameOver||!G.roundResult||TurnEngine.matchOver(G)||gameNow()<(G.nextRoundAt||0))return;
+  _moveBusy=true;
+  try{await commitTransition((base,now)=>{
+    if(!base.gameOver||!base.roundResult||TurnEngine.matchOver(base)||now<(base.nextRoundAt||0))throw Error('הסיבוב עדיין לא הסתיים');
+    const s=clone(base);s.gameOver=false;s.round=(s.round||1)+1;newRound(s);return s;
+  });}finally{_moveBusy=false;}
 }
 function fullRestart(){ closeOverlay(); if(MODE==='cpu') startVsComputer(); else leaveAndMenu(); }
 function confetti(n){
@@ -867,54 +874,26 @@ function confetti(n){
 function cpuTurn(){
   if(!G||G.gameOver||_moveBusy)return;
   const idx=G.turn,cpu=G.players[idx];if(cpu.forfeited)return;
-  const diff=RULES.difficulty||'medium',total=handTotal(cpu.hand);
-  if(total<=RULES.yanivLimit&&shouldCallYaniv(diff,total))return resolveYaniv(idx);
-  const best=diff==='easy'?easyDiscard(cpu.hand):bestDiscard(cpu.hand),remaining=cpu.hand.filter(c=>!best.includes(c));
-  const all=G.availableToTake||[],opts=all.filter((c,i)=>i===0||i===all.length-1);let drawn=null;
-  if(diff==='hard')drawn=pickUsefulFromPile(remaining,opts);
-  else{const lo=opts.slice().sort((a,b)=>cVal(a)-cVal(b))[0];if(lo&&(diff==='medium'?cVal(lo)<=3:cVal(lo)<=2&&Math.random()<.4))drawn=lo;}
-  return performTurn(drawn?'pile':'deck',drawn?.id,{actor:idx,discardIds:best.map(c=>c.id)});
+  const decision=CpuStrategy.decide({hand:cpu.hand,available:G.availableToTake||[],discard:G.discard||[],
+    opponentCounts:G.players.filter((p,i)=>i!==idx&&!p.forfeited).map(p=>p.hand.length),rules:RULES},RULES.difficulty||'medium');
+  if(decision.kind==='yaniv')return resolveYaniv(idx);
+  return performTurn(decision.source,decision.pickId,{actor:idx,discardIds:decision.discardIds});
 }
-function shouldCallYaniv(diff,total){
-  if(diff==='easy') return Math.random()<0.95; if(diff==='medium') return Math.random()<0.85;
-  if(total<=2) return true; if(total<=4) return Math.random()<0.7; return Math.random()<0.35;
-}
-function easyDiscard(hand){ const sets=allValidSets(hand); if(sets.length===0) return [hand[0]]; return sets[Math.floor(Math.random()*sets.length)]; }
-function pickUsefulFromPile(hand,opts){
-  if(!opts||opts.length===0) return null; let bestCard=null,bestScore=-Infinity;
-  opts.forEach(c=>{
-    if(c.r==='JOKER'){ if(0>bestScore){bestScore=0;bestCard=c;} return; }
-    let score=-cVal(c)*0.3; const sameRank=hand.filter(h=>h.r===c.r).length; if(sameRank>=1) score+=8+sameRank*4;
-    const idx=RANKS.indexOf(c.r), adj=hand.filter(h=>h.s===c.s&&Math.abs(RANKS.indexOf(h.r)-idx)<=2).length; if(adj>=1) score+=6+adj*3;
-    if(cVal(c)<=2) score+=5; if(score>bestScore){ bestScore=score; bestCard=c; }
-  });
-  return bestScore>=5?bestCard:null;
-}
-function allValidSets(hand){
-  const candidates=[], byRank={}; hand.forEach(c=>{ (byRank[c.r]=byRank[c.r]||[]).push(c); });
-  Object.values(byRank).forEach(g=>{ if(g.length>=1) candidates.push(g); });
-  const bySuit={}; hand.forEach(c=>{ if(c.r!=='JOKER'){ (bySuit[c.s]=bySuit[c.s]||[]).push(c); } });
-  Object.values(bySuit).forEach(g=>{
-    g.sort((a,b)=>RANKS.indexOf(a.r)-RANKS.indexOf(b.r)); let run=[g[0]];
-    for(let i=1;i<g.length;i++){ if(RANKS.indexOf(g[i].r)===RANKS.indexOf(g[i-1].r)+1) run.push(g[i]); else { if(run.length>=3) candidates.push(run.slice()); run=[g[i]]; } }
-    if(run.length>=3) candidates.push(run);
-  });
-  hand.forEach(c=>candidates.push([c])); return candidates.filter(isValidSet);
-}
-function bestDiscard(hand){ let best=null,bestSum=-1; allValidSets(hand).forEach(set=>{ const sum=set.reduce((s,c)=>s+cVal(c),0); if(sum>bestSum){bestSum=sum;best=set;} }); return best||[hand[0]]; }
+function allValidSets(hand){return CardRules.sets(hand);}
+function bestDiscard(hand){return CpuStrategy.bestDiscard(hand);}
 
 /* =====================================================================
    START MODES
    ===================================================================== */
 function startVsComputer(){
   RULES=clone(SETTINGS.rules); MODE='cpu';
-  const n=RULES.playerCount||2, players=[{name:myName(),avatar:SETTINGS.avatar,hand:[],score:0}];
-  for(let i=1;i<n;i++) players.push({name:'מחשב'+(n>2?' '+i:''),avatar:CPU_AV[(i-1)%3],hand:[],score:0});
+  const n=RULES.playerCount||2;_sessionProfile=humanProfile();
+  const players=[{..._sessionProfile,hand:[],score:0},...botProfiles(n-1,_sessionProfile)];
   G={gameId:crypto.randomUUID(),hostIndex:0,players,meIndex:0,humanIndices:[0],turn:0,deck:[],discard:[],gameOver:false,round:1,rules:{...RULES}};
   _statsKey=null; ROOM=null; newRound(G); closeOverlay(); resetClocks(); startClock(); showScreen('game');
   startTurn();
 }
-function quitGame(){ stopClock(); closeOverlay(); if(MODE==='online'){ leaveAndMenu(); return; } G=null; MODE=null; FLY.clear(); go('menu'); }
+function quitGame(){ cancelRoundAdvance();stopClock(); closeOverlay(); if(MODE==='online'){ leaveAndMenu(); return; } G=null; MODE=null; FLY.clear(); go('menu'); }
 
 /* =====================================================================
    ONLINE — existing tables, atomic turn updates
@@ -959,12 +938,12 @@ function renderWait(elId,total,list,code){
   const cx=150, cy=112, rx=118, ry=84; let html=`<div class="wt"><span>${code?esc(code):''}</span></div>`;
   for(let i=0;i<total;i++){
     const a=(90+i*360/total)*Math.PI/180, x=cx+rx*Math.cos(a), y=cy+ry*Math.sin(a), p=list[i];
-    html+=p?`<div class="st ${i>=prev&&filled>prev?'pop':''}" style="left:${x}px;top:${y}px">${avHtml(p.av,52)}<em>${esc(p.name)}</em></div>`
+    html+=p?`<div class="st ${i>=prev&&filled>prev?'pop':''}" style="left:${x}px;top:${y}px">${avHtml(p.av,52)}<em>${esc(p.name)}${p.level?` · רמה ${p.level}`:""}</em></div>`
             :`<div class="st empty" style="left:${x}px;top:${y}px"><div class="em">${ico('plus')}</div><em>פנוי</em></div>`;
   }
   el.innerHTML=html;
 }
-function roomWaitList(){ return G.players.map((p,i)=>p.name==='מחכה...'?null:{av:i===G.meIndex?SETTINGS.avatar:avatarOf(p,i),name:i===G.meIndex?'אתה':pname(p)}); }
+function roomWaitList(){ return G.players.map((p,i)=>p.name==='מחכה...'?null:{av:avatarOf(p,i),name:pname(p),level:playerLevel(p)}); }
 function shareRoom(){
   const text='בוא לשחק איתי יניב! קוד החדר: '+ROOM;
   if(navigator.share) navigator.share({text,url:location.href}).catch(()=>{});
@@ -976,8 +955,8 @@ async function createRoom(btn){
   if(!initSb()) return; if(btn) btn.classList.add('busy');
   try{
     RULES=clone(SETTINGS.rules);
-    const name=myName(), n=RULES.playerCount||2; ROOM=rndCode(); MODE='online';
-    const players=[{name,avatar:SETTINGS.avatar,hand:[],score:0}]; for(let i=1;i<n;i++) players.push({name:'מחכה...',hand:[],score:0});
+    _sessionProfile=humanProfile();const name=_sessionProfile.name, n=RULES.playerCount||2; ROOM=rndCode(); MODE='online';
+    const players=[{..._sessionProfile,hand:[],score:0}]; for(let i=1;i<n;i++) players.push({name:'מחכה...',hand:[],score:0});
     G={players,meIndex:0,iAmHost:true,humanIndices:Array.from({length:n},(_,i)=>i),turn:0,deck:[],discard:[],gameOver:false,started:false,round:1,rules:{...RULES}};
     const {error}=await sb.from('yaniv_games').insert({code:ROOM,state:G});
     if(error){ toast('שגיאה: '+error.message,2800,'err'); return; }
@@ -996,7 +975,7 @@ async function createRoom(btn){
 }
 async function joinRoom(btn){
   if(!initSb()) return;
-  const name=myName(), code=$('joinCode').value.trim().toUpperCase();
+  _sessionProfile=humanProfile();const name=_sessionProfile.name, code=$('joinCode').value.trim().toUpperCase();
   if(code.length<4){ toast('קוד לא תקין',1800,'err'); return; }
   if(btn) btn.classList.add('busy');
   try{
@@ -1004,10 +983,10 @@ async function joinRoom(btn){
     if(error||!data){ toast('חדר לא נמצא',2000,'err'); return; }
     ROOM=code; MODE='online'; G=data.state;
     const slot=G.players.findIndex(p=>p.name==='מחכה...'); if(slot<0){ toast('החדר מלא',2000,'err'); return; }
-    G.meIndex=slot; G.iAmHost=false; applyRulesFrom(G); G.players[slot].name=name; G.players[slot].avatar=SETTINGS.avatar;
+    G.meIndex=slot; G.iAmHost=false; applyRulesFrom(G); Object.assign(G.players[slot],_sessionProfile);
     const allJoined=G.players.every(p=>p.name!=='מחכה...');
     if(allJoined){
-      newRound(G); G.turn=0; G.started=true; G.gameOver=false; await pushState(); subscribe();
+      G.gameId=crypto.randomUUID();newRound(G); G.started=true; G.gameOver=false; await pushState(); subscribe();
       _statsKey=null; resetClocks(); startClock(); showScreen('game'); startTurn(); startGamePoll(); toast('כולם הצטרפו — המשחק מתחיל');
     } else {
       await pushState(); subscribe(); setOnlineWaiting('room');
@@ -1048,7 +1027,7 @@ function applyRemote(remote){
   }else{const joined=G.players.filter(p=>p.name!=='מחכה...').length;$('onlineStatus').textContent='ממתינים לשחקנים ('+joined+'/'+G.players.length+')';renderWait('roomWait',G.players.length,roomWaitList(),ROOM);}
 }
 function leaveAndMenu(){
-  leaveLobby(); stopClock(); closeOverlay(); clearInterval(_hostPollTimer); clearInterval(_gamePollTimer);
+  leaveLobby(); cancelRoundAdvance();stopClock(); closeOverlay(); clearInterval(_hostPollTimer); clearInterval(_gamePollTimer);
   if(channel&&sb) sb.removeChannel(channel);
   channel=null; ROOM=null; G=null; MODE=null; FLY.clear(); $('net').classList.remove('show'); setOnlineWaiting('home'); $('onlineStatus').textContent=''; go('menu');
 }
@@ -1057,7 +1036,7 @@ function leaveAndMenu(){
 let _myLobbyId=null, _lobbyPollTimer=null;
 async function enterMatchmaking(){
   if(!initSb()) return;
-  const name=myName(), count=SETTINGS.lobbyCount;
+  _sessionProfile=humanProfile();const name=_sessionProfile.name, count=SETTINGS.lobbyCount;
   setOnlineWaiting('lobby'); $('lobbyStatusText').textContent='מחפשים '+count+' שחקנים';
   renderWait('lobbyWait',count,[{av:SETTINGS.avatar,name:'אתה'}],'');
   const {data,error}=await sb.from('yaniv_lobby').insert({name,player_count:count}).select().single();
@@ -1075,9 +1054,9 @@ async function enterMatchmaking(){
       const matched=waiting.slice(0,count); if(matched[0].id!==_myLobbyId) return;
       clearInterval(_lobbyPollTimer);
       RULES={...clone(SETTINGS.rules),playerCount:count}; ROOM=rndCode(); MODE='online';
-      const players=matched.map(r=>({name:r.name,hand:[],score:0})); players[0].avatar=SETTINGS.avatar;
+      const players=matched.map((r,i)=>({name:r.name,avatar:hash(String(r.id))%AV_COUNT,level:1,bot:false,hand:[],score:0}));Object.assign(players[0],_sessionProfile);
       G={players,meIndex:0,iAmHost:true,humanIndices:matched.map((_,i)=>i),turn:0,deck:[],discard:[],gameOver:false,started:false,round:1,rules:{...RULES}};
-      newRound(G); G.started=true;
+      G.gameId=crypto.randomUUID();newRound(G); G.started=true;
       const {error:err}=await sb.from('yaniv_games').insert({code:ROOM,state:G});
       if(err){ toast('שגיאה ביצירת חדר: '+err.message,2800,'err'); return; }
       await Promise.all(matched.map((r,i)=>sb.from('yaniv_lobby').update({room_code:ROOM,player_index:i}).eq('id',r.id)));
@@ -1090,7 +1069,7 @@ async function _lobbyJoinAsGuest(roomCode,playerIndex){
   const {data,error}=await sb.from('yaniv_games').select('state').eq('code',roomCode).single();
   if(error||!data){ toast('שגיאה בהצטרפות לשולחן',2400,'err'); setOnlineWaiting('home'); return; }
   await sb.from('yaniv_lobby').delete().eq('id',_myLobbyId); _myLobbyId=null;
-  ROOM=roomCode; MODE='online'; G=data.state; G.meIndex=playerIndex; G.iAmHost=false; applyRulesFrom(G); G.players[playerIndex].avatar=SETTINGS.avatar;
+  ROOM=roomCode; MODE='online'; G=data.state; G.meIndex=playerIndex; G.iAmHost=false; applyRulesFrom(G); Object.assign(G.players[playerIndex],_sessionProfile||humanProfile());await syncMyProfile();
   subscribe(); _statsKey=null; resetClocks(); startClock(); showScreen('game'); startTurn(); startGamePoll(); toast('נמצאו שחקנים — המשחק מתחיל');
 }
 async function leaveLobby(){
@@ -1121,7 +1100,7 @@ function paperSound(duration=.09,volume=.09,frequency=1800){
     source.connect(filter);filter.connect(gain);gain.connect(ctx.destination);gain.gain.setValueAtTime(.001,t);gain.gain.linearRampToValueAtTime(volume,t+.012);gain.gain.exponentialRampToValueAtTime(.001,t+duration);source.start(t);source.stop(t+duration+.01);
   }catch(e){}
 }
-function sfxTick(){playTone(880,'sine',.045,.035);}
+function sfxTick(){paperSound(.028,.075,3200);playTone(1250,'triangle',.028,.055,700);}
 function sfxTimeout(){playTone(330,'triangle',.14,.07);playTone(247,'triangle',.22,.06,null,.13);}
 function sfxSelect(){paperSound(.05,.045,2600);playTone(780,'sine',.035,.035);vibrate(10);}
 function sfxDeselect(){paperSound(.04,.03,1600);vibrate(6);}

@@ -25,10 +25,10 @@ const clone=o=>JSON.parse(JSON.stringify(o));
  });
  const pages=[await ctx.newPage(),await ctx.newPage()];
  for(const p of pages){p.on('pageerror',e=>errors.push(e.message));await p.goto('http://127.0.0.1:4175');await p.waitForFunction(()=>typeof supabase!=='undefined');await p.evaluate(()=>{PREFS.sound=false;startVsComputer();stopClock();});}
- const seed=await pages[0].evaluate(()=>{const d=buildDeck();G.players[0].hand=d.splice(0,5);G.players[1].hand=d.splice(0,5);G.availableToTake=d.splice(0,1);G.discard=[];G.deck=d;G.started=true;G.humanIndices=[0,1];G.turnDeadline=Date.now()+15000;G.turnSequence=10;G._animateDeal=false;return JSON.parse(JSON.stringify(G));});
+ const seed=await pages[0].evaluate(()=>{const d=buildDeck();G.players[0].hand=d.splice(0,5);G.players[1].hand=d.splice(0,5);G.availableToTake=d.splice(0,1);G.discard=[];G.deck=d;G.turn=0;G.started=true;G.humanIndices=[0,1];G.turnDeadline=Date.now()+15000;G.turnSequence=10;G._animateDeal=false;return JSON.parse(JSON.stringify(G));});
  async function reset(patch={}){
    row={code:'TEST',state:{...clone(seed),...patch},updated_at:new Date(Date.now()-5000).toISOString()};writes=0;patchAttempts=0;
-   await Promise.all(pages.map((p,i)=>p.evaluate(({s,i})=>{stopClock();closeOverlay();G=s;G.meIndex=i;G.iAmHost=i===0;MODE='online';ROOM='TEST';RULES={...G.rules};selected.clear();FLY.clear();_moveBusy=false;_timeoutBusy=false;_timeoutRetryAt=Date.now()+60000;_lastSeenUpdatedAt=null;sb=supabase.createClient('https://yaniv-test.invalid',SB_KEY,{auth:{persistSession:false,autoRefreshToken:false}});render();}, {s:clone(row.state),i})));
+   await Promise.all(pages.map((p,i)=>p.evaluate(({s,i})=>{stopClock();cancelRoundAdvance();closeOverlay();G=s;G.meIndex=i;G.iAmHost=i===0;MODE='online';ROOM='TEST';RULES={...G.rules};selected.clear();FLY.clear();_moveBusy=false;_timeoutBusy=false;_timeoutRetryAt=Date.now()+60000;_lastSeenUpdatedAt=null;sb=supabase.createClient('https://yaniv-test.invalid',SB_KEY,{auth:{persistSession:false,autoRefreshToken:false}});render();}, {s:clone(row.state),i})));
  }
  await reset({turnDeadline:Date.now()-20});
  await Promise.all(pages.map(p=>p.evaluate(()=>expireTurn())));
@@ -52,6 +52,13 @@ const clone=o=>JSON.parse(JSON.stringify(o));
  await pages[1].evaluate(()=>expireTurn());
  assert.equal(writes,1);assert.equal(row.state.players[0].forfeited,true);assert.equal(row.state.hostIndex,1);assert.equal(row.state.forfeitResult.winnerIdx,1);
  console.log('PASS: another client can forfeit absent host after the third idle turn');
+ await reset({gameOver:true,turnDeadline:0,nextRoundAt:Date.now()+100,roundResult:{callerIdx:1,assaf:false,assafBy:null,totals:[10,3],before:[0,0],after:[10,0],halved:[]}});
+ await Promise.all(pages.map(p=>p.evaluate(()=>scheduleRoundAdvance())));await pages[0].waitForFunction(()=>G.round===2);await pages[1].waitForFunction(()=>G.round===2);
+ assert.equal(writes,1);assert.equal(row.state.turn,1);assert.equal(row.state.round,2);assert.ok(row.state.turnDeadline>Date.now());
+ console.log('PASS: two clients automatically advance once, previous winner starts');
+ await reset();await pages[1].evaluate(async()=>{_sessionProfile={name:'נור',avatar:8,level:12,bot:false};await syncMyProfile()});
+ assert.equal(writes,1);assert.equal(row.state.players[1].level,12);assert.equal(row.state.players[1].avatar,8);assert.equal(row.state.turnSequence,10);
+ console.log('PASS: online profile level and avatar synchronize without changing turn');
  assert.deepEqual(errors,[]);console.log('PASS: zero page errors; no requests or writes to the real backend');
  await browser.close();server.close();
 })().catch(e=>{console.error(e);server.close();process.exit(1)});
