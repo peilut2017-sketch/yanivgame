@@ -1,5 +1,5 @@
-const CACHE='yaniv-v5';
-const ASSETS=['./','index.html','manifest.json','icon-192.png','icon-180.png','icon-512.png'];
+const CACHE='yaniv-v7-timed-turns';
+const ASSETS=['./','index.html','styles.css','turn-engine.js','turn-controller.js','assets/mediterranean-terrace.webp','assets/club-portraits.webp','manifest.json','icon-192.png','icon-180.png','icon-512.png'];
 
 self.addEventListener('install',e=>{
   e.waitUntil(
@@ -27,6 +27,6 @@ self.addEventListener('fetch',e=>{
     fetch(e.request).then(res=>{
       if(res&&(res.ok||res.type==='opaque')){ const copy=res.clone(); caches.open(CACHE).then(c=>c.put(e.request,copy)); }
       return res;
-    }).catch(()=>caches.match(e.request).then(r=>r||caches.match('index.html')))
+    }).catch(()=>caches.match(e.request).then(r=>r||(e.request.mode==='navigate'?caches.match('index.html'):Response.error())))
   );
 });

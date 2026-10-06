@@ -1,0 +1,15 @@
+{
+  "name": "yaniv-mediterranean-club",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static Yaniv PWA; development tooling only",
+  "scripts": {
+    "dev": "node scripts/serve.cjs",
+    "verify": "node scripts/verify.cjs",
+    "test": "node --test scripts/turn-engine.test.cjs",
+    "test:online": "node scripts/online-turns.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
